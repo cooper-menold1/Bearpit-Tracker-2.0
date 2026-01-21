@@ -1,0 +1,5 @@
+{
+  "name": "BearPit Attendance Tracker",
+  "description": "A centralized attendance tracking system for Baylor University sports, for the bearpit club.",
+  "requestFramePermissions": []
+}
