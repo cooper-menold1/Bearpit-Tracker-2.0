@@ -59,7 +59,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-[#154734] via-[#154734]/60 to-transparent pointer-events-none" />
                 <div className="relative z-10 px-8 transform hover:scale-105 transition-transform duration-500">
-                    <img src={LOGO_V2} alt="The Bear Pit" className="w-full max-w-xl drop-shadow-2xl" />
+                    <img src={LOGO_V2} alt="The BearPit" className="w-full max-w-xl drop-shadow-2xl" />
                 </div>
             </div>
 
@@ -135,11 +135,12 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
 
                 <div className="w-full bg-[#0f3325] text-white py-32 px-4 border-t border-[#FFB81C]/10">
                     <div className="max-w-4xl mx-auto text-center space-y-10">
-                        <div className="inline-block p-2 px-4 rounded-full bg-[#FFB81C]/10 text-[#FFB81C] font-bold tracking-widest uppercase text-sm mb-4">Tradition & Spirit</div>
+                        <div className="inline-block p-2 px-4 rounded-full bg-[#FFB81C]/10 text-[#FFB81C] font-bold tracking-widest uppercase text-sm mb-4">Spirit & Traditions</div>
                         <h2 className="text-5xl md:text-6xl font-extrabold text-white tracking-tight">More than a <span className="text-[#FFB81C]">student section.</span></h2>
                         <div className="prose prose-xl prose-invert mx-auto text-gray-300">
-                            <p className="leading-relaxed">The Baylor Bear Pit is the heartbeat of student energy at Baylor Athletics. We are a passionate community dedicated to creating an electrifying atmosphere for our teams.</p>
-                            <p className="leading-relaxed mt-8">Behind every chant, every roar, and every coordinated cheer is a dedicated <strong className="text-[#FFB81C]">Leadership Team</strong> of students. These leaders work tirelessly to design game themes, coordinate spirit events, and ensure that the Bear Pit remains the most intimidating student section in the Big 12. We don't just watch the game; we affect the outcome.</p>
+                            <p className="leading-relaxed text-white font-medium">The BearPit represents the official student section for Baylor Athletics and those dedicated to cheering for sports. The BearPit leadership Team is a group of students who are committed to creating the best home-court advantage for our Bears in all sports.</p>
+                            <p className="leading-relaxed mt-8">The BearPit Leadership Team leads chants, traditions, and fan engagement throughout Baylor athletic events. Our goal is to serve as the bridge between Baylor students and student-athletes—encouraging, supporting, and amplifying the hard work our athletes put in every day.</p>
+                            <p className="leading-relaxed mt-8 font-semibold text-[#FFB81C]">BearPit is a passionate community dedicated to creating an electrifying and hostile game-day environment that benefits our teams and fuels school spirit. Our organization is made up of some of the loudest and rowdiest students on campus who love Baylor sports and want to build community with fellow Baylor sports fans.</p>
                         </div>
                         <div className="pt-12">
                             <span className="inline-block px-12 py-4 border-2 border-[#FFB81C] text-[#FFB81C] rounded-full font-bold uppercase tracking-wider hover:bg-[#FFB81C] hover:text-[#154734] transition-all duration-300 cursor-default">Sic 'Em Bears</span>
@@ -147,7 +148,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                     </div>
                 </div>
                 <div className="bg-[#0a2319] w-full py-12 text-center text-white/20 text-sm border-t border-white/5">
-                    <p>&copy; {new Date().getFullYear()} Baylor Bear Pit. All rights reserved.</p>
+                    <p>&copy; {new Date().getFullYear()} Baylor BearPit. All rights reserved.</p>
                 </div>
             </div>
         </div>
