@@ -1,213 +1,155 @@
-import React, { useState, useEffect, useMemo } from 'react';
+
+import React, { useState } from 'react';
 import { Member, Selfie } from '../types';
-import { Lock, User, ArrowRight, AlertCircle, Camera, Eye, EyeOff, Music, FileText } from 'lucide-react';
-import bearPitLogo from '../assets/bearpit_logo.png';
+import { Music, QrCode, User } from 'lucide-react';
+import LOGO_V2 from '../assets/bearpit_logo_v2.png';
 
 interface LoginProps {
     members: Member[];
     onLogin: (member: Member) => void;
     onGuest: () => void;
-    onChants?: () => void;
-    selfies?: Selfie[];
+    onChants: () => void;
+    selfies: Selfie[];
 }
 
-export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChants, selfies = [] }) => {
-    const [nameInput, setNameInput] = useState('');
+export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChants, selfies }) => {
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [step, setStep] = useState<'name' | 'password'>('name');
     const [error, setError] = useState('');
-    const [matchedMember, setMatchedMember] = useState<Member | null>(null);
 
-    const backgroundPhotos = useMemo(() => {
-        if (!selfies || selfies.length === 0) return [];
-        return [...selfies].sort(() => 0.5 - Math.random()).slice(0, 24);
-    }, [selfies]);
-
-    const handleNameSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-        const trimmedName = nameInput.trim();
 
-        if (!trimmedName) return;
+        const input = email.toLowerCase().trim();
 
-        const memberMatch = members.find(m =>
-            `${m.firstName} ${m.lastName}`.toLowerCase() === trimmedName.toLowerCase()
-        );
+        // Match logic:
+        // 1. Try email match
+        // 2. If no email match, try full name match (failsafe)
+        let member = members.find(m => m.email?.toLowerCase().trim() === input);
 
-        if (memberMatch) {
-            setMatchedMember(memberMatch);
-            setStep('password');
-            return;
+        if (!member) {
+            member = members.find(m =>
+                `${m.firstName} ${m.lastName}`.toLowerCase().trim() === input
+            );
         }
 
-        setError('Member not found. For attendance, please use the Attendance Login button.');
-    };
-
-    const handlePasswordSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!matchedMember) return;
-        const memberPass = matchedMember.password || 'BPLT';
-        if (password === memberPass) {
-            onLogin(matchedMember);
+        if (member && (member.password === password || member.password === undefined)) {
+            onLogin(member);
         } else {
-            setError('Incorrect password.');
+            setError('Invalid credentials. If you do not have an email on file, try your full name.');
         }
     };
+
+    const recentSelfies = selfies
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 30);
 
     return (
-        <div className="min-h-screen bg-[#154734] flex flex-col font-sans">
-
-            {/* 1. HERO SECTION (Selfie Grid + Logo) */}
-            <div className="relative h-[50vh] min-h-[400px] w-full bg-[#0a2e20] overflow-hidden border-b-8 border-[#FFB81C]">
-
-                {/* Selfie Grid Background */}
-                <div className="absolute inset-0 opacity-60">
-                    {backgroundPhotos.length > 0 ? (
-                        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1 p-1 h-full content-center">
-                            {backgroundPhotos.map((photo, i) => (
-                                <div key={i} className="aspect-square rounded-sm overflow-hidden relative bg-gray-800">
-                                    <img
-                                        src={photo.imageData}
-                                        alt=""
-                                        className="w-full h-full object-cover opacity-80"
-                                    />
-                                </div>
-                            ))}
+        <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+            <div className="sticky top-0 h-[65vh] w-full overflow-hidden flex items-start justify-center pt-16 bg-[#154734] z-0 shadow-2xl">
+                <div className="absolute inset-0 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-0 opacity-40">
+                    {recentSelfies.map(selfie => (
+                        <div key={selfie.id} className="relative aspect-square overflow-hidden">
+                            <img src={selfie.imageData} alt="Selfie" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
                         </div>
-                    ) : (
-                        <div className="w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#154734] via-transparent to-black/30"></div>
+                    ))}
+                    {Array.from({ length: Math.max(0, 30 - recentSelfies.length) }).map((_, i) => (
+                        <div key={`filler-${i}`} className="bg-green-900/20 w-full h-full animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+                    ))}
                 </div>
-
-                {/* Floating Logo Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center z-10 p-8">
-                    <div className="relative transform hover:scale-105 transition-transform duration-500 max-w-2xl w-full">
-                        <img
-                            src={bearPitLogo}
-                            alt="The Bear Pit"
-                            className="w-full h-auto drop-shadow-2xl filter brightness-110"
-                        />
-                    </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#154734] via-[#154734]/60 to-transparent pointer-events-none" />
+                <div className="relative z-10 px-8 transform hover:scale-105 transition-transform duration-500">
+                    <img src={LOGO_V2} alt="The Bear Pit" className="w-full max-w-xl drop-shadow-2xl" />
                 </div>
             </div>
 
-
-            {/* 2. ACTION GRID */}
-            <div className="flex-1 bg-[#154734] p-4 md:p-8">
-                <div className="max-w-7xl mx-auto h-full flex flex-col justify-center">
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-
-                        {/* Column 1: Gameday Chants */}
-                        <button
-                            onClick={onChants}
-                            className="group relative h-80 md:h-96 rounded-xl overflow-hidden border-2 border-[#FFB81C]/30 hover:border-[#FFB81C] transition-all duration-300 shadow-xl hover:shadow-[#FFB81C]/20 bg-[#0f3325]"
-                        >
-                            <div className="absolute -right-12 -bottom-12 text-white/5 group-hover:text-white/10 transition-colors duration-500">
-                                <Music className="w-64 h-64" />
+            <div className="relative z-10 bg-gray-50 flex flex-col items-center w-full shadow-[0_-20px_50px_rgba(0,0,0,0.3)]">
+                <div className="w-full max-w-7xl mx-auto px-4 py-12">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <button onClick={onChants} className="bg-[#154734] group relative overflow-hidden rounded-3xl shadow-2xl hover:shadow-[0_20px_60px_rgba(21,71,52,0.4)] transition-all duration-300 transform hover:-translate-y-2 border border-[#FFB81C]/20 flex flex-col h-[600px]">
+                            <div className="absolute -right-12 -bottom-12 text-[#FFB81C] opacity-10 group-hover:opacity-20 transition-opacity duration-500 transform group-hover:rotate-12">
+                                <Music className="w-80 h-80" />
                             </div>
-
-                            <div className="absolute inset-0 p-8 flex flex-col justify-between z-10 text-left">
-                                <div className="bg-[#FFB81C] w-16 h-16 rounded-full flex items-center justify-center text-[#154734] shadow-lg group-hover:scale-110 transition-transform">
-                                    <FileText className="w-8 h-8" />
+                            <div className="absolute top-0 left-0 w-2 h-full bg-[#FFB81C] group-hover:w-4 transition-all duration-300" />
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 text-center space-y-8">
+                                <div className="bg-[#FFB81C] p-8 rounded-full text-[#154734] shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                    <Music className="w-16 h-16" />
                                 </div>
                                 <div>
-                                    <h2 className="text-3xl font-extrabold text-white mb-2 group-hover:text-[#FFB81C] transition-colors">
-                                        Gameday Chants
-                                    </h2>
-                                    <p className="text-green-100/80 font-medium text-lg">
-                                        View official cheers & chant sheets for today's game.
-                                    </p>
+                                    <h3 className="text-4xl font-extrabold text-[#FFB81C] mb-4 tracking-tight">Gameday<br />Chants</h3>
+                                    <p className="text-white/80 font-medium text-lg leading-relaxed">View lyrics and leading guides for today's game.</p>
                                 </div>
                             </div>
                         </button>
 
-
-                        {/* Column 2: Attendance Login */}
-                        <button
-                            onClick={onGuest}
-                            className="group relative h-80 md:h-96 rounded-xl overflow-hidden border-2 border-[#FFB81C] hover:border-white transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(255,184,28,0.3)] bg-gradient-to-br from-[#1c5c44] to-[#0f3325]"
-                        >
-                            <div className="absolute -right-8 -top-8 text-[#FFB81C]/10 group-hover:text-[#FFB81C]/20 transition-colors">
-                                <Camera className="w-48 h-48" />
+                        <button onClick={onGuest} className="bg-[#154734] group relative overflow-hidden rounded-3xl shadow-2xl hover:shadow-[0_20px_60px_rgba(21,71,52,0.4)] transition-all duration-300 transform hover:-translate-y-2 border border-[#FFB81C]/20 flex flex-col h-[600px]">
+                            <div className="absolute -right-12 -top-12 text-[#FFB81C] opacity-10 group-hover:opacity-20 transition-opacity duration-500 transform group-hover:-rotate-12">
+                                <QrCode className="w-80 h-80" />
                             </div>
-
-                            <div className="absolute inset-0 p-8 flex flex-col items-center justify-center z-10 text-center">
-                                <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center text-[#154734] shadow-xl mb-6 group-hover:scale-110 transition-transform duration-300">
-                                    <Camera className="w-10 h-10" />
+                            <div className="absolute top-0 left-0 w-2 h-full bg-[#FFB81C] group-hover:w-4 transition-all duration-300" />
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 text-center space-y-8">
+                                <div className="bg-[#FFB81C] p-8 rounded-full text-[#154734] shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                    <QrCode className="w-16 h-16" />
                                 </div>
-                                <h2 className="text-4xl font-extrabold text-white mb-3 tracking-tight uppercase">
-                                    Attendance<br /><span className="text-[#FFB81C]">Login</span>
-                                </h2>
-                                <span className="inline-block px-6 py-2 rounded-full border border-[#FFB81C] text-[#FFB81C] font-bold text-sm tracking-wider uppercase group-hover:bg-[#FFB81C] group-hover:text-[#154734] transition-all">
-                                    Click to Check In
-                                </span>
+                                <div>
+                                    <h3 className="text-4xl font-extrabold text-[#FFB81C] mb-4 tracking-tight">Attendance<br />Login</h3>
+                                    <p className="text-white/80 font-medium text-lg leading-relaxed">For Bearpit Leadership Members Only.</p>
+                                </div>
                             </div>
                         </button>
 
-
-                        {/* Column 3: Member Login */}
-                        <div className="h-80 md:h-96 rounded-xl overflow-hidden border border-gray-700 bg-white shadow-xl relative flex flex-col">
-                            <div className="bg-gray-50 p-4 border-b border-gray-100 flex items-center gap-3">
-                                <div className="bg-[#154734] p-2 rounded-lg text-white">
-                                    <User className="w-5 h-5" />
+                        <div className="bg-[#154734] rounded-3xl shadow-2xl border border-[#FFB81C]/20 p-8 h-[600px] flex flex-col justify-center relative overflow-hidden">
+                            <div className="absolute -right-8 -bottom-8 text-[#FFB81C] opacity-5">
+                                <User className="w-64 h-64" />
+                            </div>
+                            <div className="text-center mb-10 relative z-10">
+                                <div className="bg-[#FFB81C] p-6 rounded-full text-[#154734] shadow-lg w-20 h-20 mx-auto flex items-center justify-center mb-6">
+                                    <User className="w-10 h-10" />
                                 </div>
-                                <h3 className="text-xl font-bold text-[#154734]">Member Login</h3>
+                                <h3 className="text-3xl font-extrabold text-[#FFB81C] mb-2">Member Portal</h3>
+                                <p className="text-white/70 text-sm">Enter Baylor Email or Full Name</p>
                             </div>
-
-                            <div className="p-6 flex-1 flex flex-col justify-center">
-                                {step === 'name' ? (
-                                    <form onSubmit={handleNameSubmit} className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Name</label>
-                                            <input
-                                                type="text"
-                                                value={nameInput}
-                                                onChange={(e) => { setNameInput(e.target.value); setError(''); }}
-                                                className="block w-full bg-gray-50 text-black border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-[#154734] outline-none"
-                                                placeholder="Enter your name..."
-                                            />
-                                        </div>
-                                        {error && <p className="text-red-600 text-xs font-bold">{error}</p>}
-                                        <button className="w-full py-3 bg-[#154734] text-white font-bold rounded-lg hover:bg-[#0f3325] transition-colors">
-                                            Continue
-                                        </button>
-                                    </form>
-                                ) : (
-                                    <form onSubmit={handlePasswordSubmit} className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                                        <div className="text-center mb-2">
-                                            <h3 className="text-lg font-bold text-[#154734]">{matchedMember?.firstName} {matchedMember?.lastName}</h3>
-                                            <button type="button" onClick={() => { setStep('name'); setError(''); setPassword(''); }} className="text-xs text-gray-400 hover:text-gray-600 underline">Not you?</button>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Password</label>
-                                            <input
-                                                type="password"
-                                                value={password}
-                                                onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                                                className="block w-full bg-gray-50 text-black border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-[#154734] outline-none"
-                                                placeholder="••••••••"
-                                                autoFocus
-                                            />
-                                        </div>
-                                        {error && <p className="text-red-600 text-xs font-bold">{error}</p>}
-                                        <button className="w-full py-3 bg-[#154734] text-white font-bold rounded-lg hover:bg-[#0f3325] transition-colors">
-                                            Login
-                                        </button>
-                                    </form>
-                                )}
-                            </div>
-                            <div className="bg-gray-50 p-3 text-center border-t border-gray-100">
-                                <p className="text-[10px] text-gray-400 uppercase">Authorized Personnel Only</p>
-                            </div>
+                            <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
+                                <input
+                                    type="text"
+                                    placeholder="Email or Full Name"
+                                    className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    autoComplete="off"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Password"
+                                    className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="new-password"
+                                />
+                                <button type="submit" className="w-full bg-[#FFB81C] text-[#154734] py-4 rounded-xl font-extrabold text-xl hover:bg-white transition-colors shadow-lg mt-4">Sign In</button>
+                                {error && <p className="text-red-300 text-sm text-center font-bold animate-pulse bg-red-900/20 p-2 rounded">{error}</p>}
+                            </form>
                         </div>
-
                     </div>
                 </div>
-            </div>
 
+                <div className="w-full bg-[#0f3325] text-white py-32 px-4 border-t border-[#FFB81C]/10">
+                    <div className="max-w-4xl mx-auto text-center space-y-10">
+                        <div className="inline-block p-2 px-4 rounded-full bg-[#FFB81C]/10 text-[#FFB81C] font-bold tracking-widest uppercase text-sm mb-4">Tradition & Spirit</div>
+                        <h2 className="text-5xl md:text-6xl font-extrabold text-white tracking-tight">More than a <span className="text-[#FFB81C]">student section.</span></h2>
+                        <div className="prose prose-xl prose-invert mx-auto text-gray-300">
+                            <p className="leading-relaxed">The Baylor Bear Pit is the heartbeat of student energy at Baylor Athletics. We are a passionate community dedicated to creating an electrifying atmosphere for our teams.</p>
+                            <p className="leading-relaxed mt-8">Behind every chant, every roar, and every coordinated cheer is a dedicated <strong className="text-[#FFB81C]">Leadership Team</strong> of students. These leaders work tirelessly to design game themes, coordinate spirit events, and ensure that the Bear Pit remains the most intimidating student section in the Big 12. We don't just watch the game; we affect the outcome.</p>
+                        </div>
+                        <div className="pt-12">
+                            <span className="inline-block px-12 py-4 border-2 border-[#FFB81C] text-[#FFB81C] rounded-full font-bold uppercase tracking-wider hover:bg-[#FFB81C] hover:text-[#154734] transition-all duration-300 cursor-default">Sic 'Em Bears</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-[#0a2319] w-full py-12 text-center text-white/20 text-sm border-t border-white/5">
+                    <p>&copy; {new Date().getFullYear()} Baylor Bear Pit. All rights reserved.</p>
+                </div>
+            </div>
         </div>
     );
 };
