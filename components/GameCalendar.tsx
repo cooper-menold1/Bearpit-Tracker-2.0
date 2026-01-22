@@ -86,9 +86,9 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
 
             {/* Content */}
             {viewMode === 'calendar' ? (
-                <div className="flex flex-col flex-1">
+                <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                     {/* Grid Header */}
-                    <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                    <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 shrink-0 sticky top-0 z-10">
                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                             <div key={day} className="py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 {day}
@@ -97,7 +97,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                     </div>
 
                     {/* Grid Body */}
-                    <div className="grid grid-cols-7 bg-gray-200 gap-px border-b border-gray-200 flex-1">
+                    <div className="flex-1 overflow-y-auto min-h-0"><div className="grid grid-cols-7 bg-gray-200 gap-px border-b border-gray-200 h-full">
                         {Array.from({ length: firstDayOfMonth }).map((_, i) => (
                             <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[100px]"></div>
                         ))}
@@ -145,6 +145,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                             <div key={`end-empty-${i}`} className="bg-gray-50/50 min-h-[100px]"></div>
                         ))}
                     </div>
+                </div>
                 </div>
             ) : (
                 <div className="flex-1 overflow-auto bg-gray-50">

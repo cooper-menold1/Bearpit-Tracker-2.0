@@ -305,7 +305,7 @@ export const Management: React.FC<ManagementProps> = ({
 
                 {/* --- GAMES TAB --- */}
                 {activeTab === 'games' && (
-                    <div className="h-full relative">
+                    <div className="h-[600px] max-h-[80vh] relative">
                         <GameCalendar
                             games={games}
                             sports={sports}

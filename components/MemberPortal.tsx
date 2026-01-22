@@ -322,7 +322,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                         </div>
                     </div>
                 ) : (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-[600px] max-h-[80vh]">
                         <GameCalendar
                             games={data.games}
                             sports={data.sports}
