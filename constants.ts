@@ -10,7 +10,8 @@ export const VENUES: Venue[] = [
   { id: 'getterman', name: 'Getterman Stadium', latitude: 31.54987, longitude: -97.10824, radiusMeters: 150 },
   { id: 'bettylou', name: 'Betty Lou Mays Field', latitude: 31.55177, longitude: -97.10909, radiusMeters: 200 },
   { id: 'hurd', name: 'Hurd Tennis Center', latitude: 31.55177, longitude: -97.10909, radiusMeters: 200 }, // Shares space with soccer
-  { id: 'ferrell_vb', name: 'Ferrell Center (Volleyball)', latitude: 31.547903, longitude: -97.105969, radiusMeters: 200 }
+  { id: 'ferrell_vb', name: 'Ferrell Center (Volleyball)', latitude: 31.547903, longitude: -97.105969, radiusMeters: 200 },
+  { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.546944, longitude: -97.116667, radiusMeters: 200 }
 ];
 
 export const AUTHORIZED_USERS = [
@@ -57,6 +58,7 @@ export const INITIAL_STATE: AppState = {
     { id: 'baseball', name: 'Baseball', venueIds: ['ballpark'] },
     { id: 'softball', name: 'Softball', venueIds: ['getterman'] },
     { id: 'acro', name: 'Acro & Tumbling', venueIds: ['ferrell'] },
+    { id: 'meetings', name: 'Meetings', venueIds: ['foster_campus'] },
   ],
   games: [
     // Volleyball (VB)

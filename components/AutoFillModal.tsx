@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Check, AlertCircle, Loader2, Calendar as CalendarIcon, Info, Trophy, ChevronRight, Plus, MapPin } from 'lucide-react';
+import { X, Search, Check, AlertCircle, Loader2, Calendar as CalendarIcon, Info, Trophy, ChevronRight, Plus, MapPin, Clock } from 'lucide-react';
 import { Game, Sport, Role } from '../types';
 import { fetchSchedule, ScrapedGame, resolveSportMappings } from '../utils/scraper';
 
@@ -26,6 +26,13 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
     const [gameStatuses, setGameStatuses] = useState<Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string }>>({});
     const [selectedGames, setSelectedGames] = useState<Set<number>>(new Set());
     const [activeTab, setActiveTab] = useState<'new' | 'updates'>('new');
+    const [autoFillMode, setAutoFillMode] = useState<'scrape' | 'meetings'>('scrape');
+    const [meetingConfig, setMeetingConfig] = useState({
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        time: '17:30',
+        dayOfWeek: 4 // Thursday
+    });
 
     const reset = () => {
         setStep('fetch');
@@ -35,6 +42,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
         setGameStatuses({});
         setSelectedGames(new Set());
         setActiveTab('new');
+        setAutoFillMode('scrape');
     };
 
     useEffect(() => {
@@ -93,6 +101,57 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
             console.error('Fetch error:', err);
             const detailedError = `DIAGNOSTIC INFO:\n- Message: ${err.message || 'Unknown'}\n- Component: AutoFillModal\n- Action: handleFetch\n- Month/Year: ${month}/${year}\n\nPlease copy this info and tell the assistant!`;
             alert(`Error fetching schedule:\n\n${detailedError}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    const handleGenerateMeetings = async () => {
+        setLoading(true);
+        try {
+            let meetingSportId = existingSports.find(s => s.name.toLowerCase() === 'meetings' || s.id === 'meetings')?.id;
+            if (!meetingSportId) {
+                meetingSportId = await onAddSport('Meetings');
+            }
+
+            const start = new Date(meetingConfig.startDate);
+            const end = new Date(meetingConfig.endDate);
+            const meetingsToAdd = [];
+
+            let current = new Date(start);
+            while (current.getDay() !== meetingConfig.dayOfWeek) {
+                current.setDate(current.getDate() + 1);
+            }
+
+            while (current <= end) {
+                const dateStr = current.toISOString().split('T')[0];
+                const existing = existingGames.find(g => g.date === dateStr && g.sportId === meetingSportId);
+                
+                if (!existing) {
+                    meetingsToAdd.push({
+                        id: 'meeting_' + Date.now() + '_' + current.getTime(),
+                        sportId: meetingSportId,
+                        date: dateStr,
+                        time: meetingConfig.time,
+                        opponent: 'Weekly Meeting',
+                        location: 'Home',
+                        isBonus: false,
+                        pointsValue: 1,
+                        description: 'Foster Campus'
+                    });
+                }
+                current.setDate(current.getDate() + 7);
+            }
+
+            for (const meeting of meetingsToAdd) {
+                onAddGame(meeting);
+            }
+
+            alert('Success! Generated ' + meetingsToAdd.length + ' meetings.');
+            onClose();
+        } catch (err) {
+            alert("Error generating meetings.");
         } finally {
             setLoading(false);
         }
@@ -160,7 +219,22 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-                    {step === 'fetch' && (
+                    {/* Mode Toggle */}
+                    <div className="flex bg-gray-200 p-1 rounded-xl mb-6 sticky top-0 z-10">
+                        <button 
+                            onClick={() => setAutoFillMode('scrape')} 
+                            className={'flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ' + (autoFillMode === 'scrape' ? 'bg-white text-[#154734] shadow-sm' : 'text-gray-500')}
+                        >
+                            Baylor Schedule
+                        </button>
+                        <button 
+                            onClick={() => setAutoFillMode('meetings')} 
+                            className={'flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ' + (autoFillMode === 'meetings' ? 'bg-white text-[#154734] shadow-sm' : 'text-gray-500')}
+                        >
+                            Weekly Meetings
+                        </button>
+                    </div>
+                    {autoFillMode === 'scrape' && step === 'fetch' && (
                         <div className="space-y-6 py-8">
                             <div className="flex flex-col items-center text-center space-y-4">
                                 <div className="w-16 h-16 bg-green-100 text-[#154734] rounded-full flex items-center justify-center">
@@ -204,6 +278,79 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                             </button>
                         </div>
                     )}
+
+                    {autoFillMode === 'meetings' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3 text-blue-800 text-sm">
+                                <Info className="w-5 h-5 shrink-0" />
+                                <div>
+                                    <p className="font-bold">Weekly Meeting Generator</p>
+                                    <p>Quickly generate a series of weekly meetings for the club at the Foster Campus.</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Start Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={meetingConfig.startDate}
+                                        onChange={(e) => setMeetingConfig({...meetingConfig, startDate: e.target.value})}
+                                        className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#154734] outline-none transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">End Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={meetingConfig.endDate}
+                                        onChange={(e) => setMeetingConfig({...meetingConfig, endDate: e.target.value})}
+                                        className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#154734] outline-none transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Meeting Time</label>
+                                    <div className="relative">
+                                        <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input 
+                                            type="time" 
+                                            value={meetingConfig.time}
+                                            onChange={(e) => setMeetingConfig({...meetingConfig, time: e.target.value})}
+                                            className="w-full border-2 border-gray-100 rounded-xl p-3 pl-10 text-sm font-bold focus:border-[#154734] outline-none transition-all"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Day of Week</label>
+                                    <select 
+                                        value={meetingConfig.dayOfWeek}
+                                        onChange={(e) => setMeetingConfig({...meetingConfig, dayOfWeek: Number(e.target.value)})}
+                                        className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#154734] outline-none transition-all"
+                                    >
+                                        <option value={1}>Monday</option>
+                                        <option value={2}>Tuesday</option>
+                                        <option value={3}>Wednesday</option>
+                                        <option value={4}>Thursday</option>
+                                        <option value={5}>Friday</option>
+                                        <option value={6}>Saturday</option>
+                                        <option value={0}>Sunday</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleGenerateMeetings}
+                                disabled={loading}
+                                className="w-full bg-[#154734] text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#0f3325] transition-all disabled:opacity-50 shadow-lg shadow-green-900/10 active:scale-95 mt-4"
+                            >
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Generate Weekly Meetings"}
+                            </button>
+                        </div>
+                    )}
+
 
                     {step === 'resolve-sports' && (
                         <div className="space-y-4">
