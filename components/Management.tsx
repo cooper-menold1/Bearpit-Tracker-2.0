@@ -495,9 +495,11 @@ export const Management: React.FC<ManagementProps> = ({
                             <input type="text" value={memberForm.firstName} onChange={e => setMemberForm({ ...memberForm, firstName: e.target.value })} placeholder="First" className="border p-2 rounded text-sm w-32" />
                             <input type="text" value={memberForm.lastName} onChange={e => setMemberForm({ ...memberForm, lastName: e.target.value })} placeholder="Last" className="border p-2 rounded text-sm w-32" />
                             <select value={memberForm.role} onChange={e => setMemberForm({ ...memberForm, role: e.target.value as Role })} className="border p-2 rounded text-sm">
-                                <option value={Role.MEMBER}>Member</option>
-                                <option value={Role.OFFICER}>Officer</option>
                                 <option value={Role.ADMIN}>Admin</option>
+                                <option value={Role.OFFICER}>Officer</option>
+                                <option value={Role.MEMBER}>Member</option>
+                                <option value={Role.PROSPECTIVE}>Prospective</option>
+                                <option value={Role.INACTIVE}>Inactive</option>
                             </select>
                             <button onClick={handleSaveMember} className="bg-[#154734] text-white px-4 py-2 rounded text-sm font-bold">Save</button>
                             {editingId && <button onClick={resetMemberForm} className="bg-gray-200 px-3 py-2 rounded"><X className="w-4 h-4" /></button>}
