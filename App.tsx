@@ -150,7 +150,8 @@ function App() {
             ] = await Promise.all([
                 supabase.from('sports').select('*'),
                 supabase.from('games').select('*'),
-                supabase.from('members').select('*'),
+                // SECURITY FLAGGED: Do not select password column for all users
+                supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, fall_sport_id, spring_sport_id, is_chair'),
                 supabase.from('attendance').select('*'),
                 supabase.from('selfies').select('*'),
                 supabase.from('bonus_points').select('*'),
@@ -169,7 +170,7 @@ function App() {
                 lastName: m.last_name,
                 role: (m.role.charAt(0).toUpperCase() + m.role.slice(1).toLowerCase()) as Role,
                 yearsInBPLT: m.years_in_bplt,
-                password: m.password,
+                password: m.password, // This will be undefined now, which is safer
                 email: m.email,
                 fallSportId: m.fall_sport_id,
                 springSportId: m.spring_sport_id,
@@ -296,15 +297,23 @@ function App() {
     };
 
     const handleAddMember = async (newMember: Member) => {
-        await supabase.from('members').upsert({
+        const payload: any = {
             id: newMember.id,
             first_name: newMember.firstName,
             last_name: newMember.lastName,
             role: newMember.role,
             years_in_bplt: newMember.yearsInBPLT,
-            email: newMember.email,
-            password: newMember.password || 'BPLT'
-        });
+            email: newMember.email
+        };
+        // Safely handle password assignment
+        if (newMember.password) {
+            payload.password = newMember.password;
+        } else if (!data.members.find(m => m.id === newMember.id)) {
+            // Only set default for completely new members that presumably haven't set a password yet
+            payload.password = 'BPLT';
+        }
+
+        await supabase.from('members').upsert(payload);
     };
 
     const handleDeleteMember = async (id: string) => {
@@ -438,7 +447,9 @@ function App() {
             <main className="flex-1 overflow-auto p-4 relative">{renderContent()}</main>
             <QRCodeDisplay isOpen={showQRCode} onClose={() => setShowQRCode(false)} publicUrl={data.settings.publicUrl} />
             <Instructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} sheetUrl="" adminPassword={data.settings.adminPassword} onSaveUrl={() => { }} onSaveSettings={() => { }} />
-            <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} currentMember={currentMember!} selfieVotes={data.selfieVotes} />
+            {currentMember && (
+                <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} currentMember={currentMember} selfieVotes={data.selfieVotes} />
+            )}
             <SportsManager isOpen={showSportsManager} onClose={() => setShowSportsManager(false)} sports={data.sports} games={data.games} onAddSport={handleAddSport} onDeleteSport={handleDeleteSport} onUpdateSportVenues={async (id, vids) => await supabase.from('sports').update({ venue_ids: vids }).eq('id', id)} />
             <ChantManager isOpen={showChantManager} onClose={() => setShowChantManager(false)} />
             {currentMember && (
