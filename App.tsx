@@ -307,12 +307,17 @@ function App() {
     const handleAddMember = async (newMember: Member) => {
         // Password is never written directly here (the client no longer has
         // insert/update privilege on that column -- see
-        // update_schema_v4_secure_login.sql). Instead we always attempt an
+        // update_schema_v4_secure_login.sql). Instead we attempt an
         // initial-password claim after the upsert -- rpc_claim_initial_password
         // only succeeds while that member's password is still unset, so this
-        // is a safe no-op for existing members who already have one (covers
-        // both brand-new members and Prospective members being approved into
-        // full Members, who were never given a password at intake).
+        // is a safe no-op for existing members who already have one.
+        //
+        // Skipped entirely for Prospective role: this same function is called
+        // from the public self-service check-in form (AttendanceForm), where
+        // the person submitting IS the new record -- they'd see their own
+        // "temporary password" alert on their own phone, which is confusing
+        // and pointless (prospects don't log in). Real members only get a
+        // claimed password when they're actually created/approved as Member+.
         const payload: any = {
             id: newMember.id,
             first_name: newMember.firstName,
@@ -325,13 +330,15 @@ function App() {
         const { error } = await supabase.from('members').upsert(payload);
         if (error) { alert('Error saving member: ' + error.message); return; }
 
-        const initialPassword = Math.random().toString(36).slice(-8);
-        const { data: claimed, error: claimError } = await supabase.rpc('rpc_claim_initial_password', {
-            p_member_id: newMember.id,
-            p_new_password: initialPassword
-        });
-        if (!claimError && claimed) {
-            alert(`Temporary password for ${newMember.firstName}: ${initialPassword}\n\nShare this with them -- they can change it once they log in.`);
+        if (newMember.role !== Role.PROSPECTIVE) {
+            const initialPassword = Math.random().toString(36).slice(-8);
+            const { data: claimed, error: claimError } = await supabase.rpc('rpc_claim_initial_password', {
+                p_member_id: newMember.id,
+                p_new_password: initialPassword
+            });
+            if (!claimError && claimed) {
+                alert(`Temporary password for ${newMember.firstName}: ${initialPassword}\n\nShare this with them -- they can change it once they log in.`);
+            }
         }
 
         fetchData();
