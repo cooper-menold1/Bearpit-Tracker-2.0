@@ -10,9 +10,10 @@ export interface ScrapedGame {
 }
 
 const PROXIES = [
+    (url: string) => `https://cors-get-proxy.sirjosh.workers.dev/?url=${encodeURIComponent(url)}`,
     (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
     (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}` // Third fallback
+    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}` // Fourth fallback
 ];
 
 export const fetchSchedule = async (year: number, month: number): Promise<ScrapedGame[]> => {

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { INITIAL_STATE, LOGO_URL } from './constants';
 import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote } from './types';
 import { SportSheet } from './components/SportSheet';
@@ -50,6 +50,13 @@ function App() {
         }
         return null;
     });
+    // Holds the plaintext password just used to log in, in-memory only --
+    // never persisted (not in sessionStorage, not on the Member object).
+    // Used to prove identity server-side for later password-change RPCs
+    // (rpc_set_own_password / rpc_admin_set_password) without re-prompting.
+    // Cleared on logout; lost on page refresh (a fresh privileged action
+    // after a refresh will ask the admin to log in again).
+    const currentPasswordRef = useRef<string | null>(null);
 
     const [currentView, setCurrentView] = useState<string>('dashboard');
     const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -237,8 +244,9 @@ function App() {
         return () => { supabase.removeChannel(channels); };
     }, []);
 
-    const handleLogin = (member: Member) => {
+    const handleLogin = (member: Member, password: string) => {
         setCurrentMember(member);
+        currentPasswordRef.current = password;
         setMode(member.role === Role.ADMIN ? 'dashboard' : 'member');
     };
 
@@ -246,6 +254,7 @@ function App() {
 
     const handleLogout = () => {
         setCurrentMember(null);
+        currentPasswordRef.current = null;
         setMode('login');
         sessionStorage.removeItem('bp_member');
         sessionStorage.removeItem('bp_mode');
@@ -257,20 +266,54 @@ function App() {
         if (!idToUpdate) return;
 
         try {
+            // Password changes go through server-side RPCs -- the client
+            // never writes to the password column directly (it can't; see
+            // the column-level REVOKE in update_schema_v4_secure_login.sql).
+            if (updates.password) {
+                const actingPassword = currentPasswordRef.current;
+                if (!actingPassword || !currentMember) {
+                    alert('Please log out and back in before changing a password.');
+                    return;
+                }
+
+                const isSelf = idToUpdate === currentMember.id;
+                const { data: ok, error: rpcError } = isSelf
+                    ? await supabase.rpc('rpc_set_own_password', {
+                        p_member_id: currentMember.id,
+                        p_current_password: actingPassword,
+                        p_new_password: updates.password
+                    })
+                    : await supabase.rpc('rpc_admin_set_password', {
+                        p_admin_id: currentMember.id,
+                        p_admin_password: actingPassword,
+                        p_target_member_id: idToUpdate,
+                        p_new_password: updates.password
+                    });
+
+                if (rpcError || !ok) {
+                    alert('Could not update password -- your own password may be out of date. Try logging out and back in.');
+                    return;
+                }
+
+                if (isSelf) currentPasswordRef.current = updates.password;
+            }
+
             const payload: any = {};
-            if (updates.password) payload.password = updates.password;
             if (updates.email !== undefined) payload.email = updates.email;
             if (updates.fallSportId !== undefined) payload.fall_sport_id = updates.fallSportId;
             if (updates.springSportId !== undefined) payload.spring_sport_id = updates.springSportId;
             if (updates.isChair !== undefined) payload.is_chair = updates.isChair;
 
-            const { error } = await supabase.from('members').update(payload).eq('id', idToUpdate);
-            if (error) throw error;
+            if (Object.keys(payload).length > 0) {
+                const { error } = await supabase.from('members').update(payload).eq('id', idToUpdate);
+                if (error) throw error;
+            }
 
             alert("Profile updated successfully!");
 
             if (idToUpdate === currentMember?.id) {
-                const refreshed = { ...currentMember, ...updates };
+                const refreshed: any = { ...currentMember, ...updates };
+                delete refreshed.password; // never let a real password land in state/sessionStorage
                 setCurrentMember(refreshed);
             }
 
@@ -297,6 +340,14 @@ function App() {
     };
 
     const handleAddMember = async (newMember: Member) => {
+        // Password is never written directly here (the client no longer has
+        // insert/update privilege on that column -- see
+        // update_schema_v4_secure_login.sql). Instead we always attempt an
+        // initial-password claim after the upsert -- rpc_claim_initial_password
+        // only succeeds while that member's password is still unset, so this
+        // is a safe no-op for existing members who already have one (covers
+        // both brand-new members and Prospective members being approved into
+        // full Members, who were never given a password at intake).
         const payload: any = {
             id: newMember.id,
             first_name: newMember.firstName,
@@ -305,15 +356,20 @@ function App() {
             years_in_bplt: newMember.yearsInBPLT,
             email: newMember.email
         };
-        // Safely handle password assignment
-        if (newMember.password) {
-            payload.password = newMember.password;
-        } else if (!data.members.find(m => m.id === newMember.id)) {
-            // Only set default for completely new members that presumably haven't set a password yet
-            payload.password = 'BPLT';
+
+        const { error } = await supabase.from('members').upsert(payload);
+        if (error) { alert('Error saving member: ' + error.message); return; }
+
+        const initialPassword = Math.random().toString(36).slice(-8);
+        const { data: claimed, error: claimError } = await supabase.rpc('rpc_claim_initial_password', {
+            p_member_id: newMember.id,
+            p_new_password: initialPassword
+        });
+        if (!claimError && claimed) {
+            alert(`Temporary password for ${newMember.firstName}: ${initialPassword}\n\nShare this with them -- they can change it once they log in.`);
         }
 
-        await supabase.from('members').upsert(payload);
+        fetchData();
     };
 
     const handleDeleteMember = async (id: string) => {

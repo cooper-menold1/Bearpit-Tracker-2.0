@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
-import { Member, Selfie } from '../types';
+import { Member, Selfie, Role } from '../types';
 import { Music, QrCode, User } from 'lucide-react';
 import LOGO_V2 from '../assets/bearpit_logo_v2.png';
+import { supabase } from '../utils/supabaseClient';
 
 interface LoginProps {
     members: Member[];
-    onLogin: (member: Member) => void;
+    onLogin: (member: Member, password: string) => void;
     onGuest: () => void;
     onChants: () => void;
     selfies: Selfie[];
@@ -16,28 +17,41 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
+        setLoading(true);
 
-        const input = email.toLowerCase().trim();
+        // Password verification happens server-side now -- the client never
+        // sees real password hashes (see rpc_login in the DB).
+        const { data, error: rpcError } = await supabase.rpc('rpc_login', {
+            p_identifier: email.trim(),
+            p_password: password
+        });
 
-        // Match logic:
-        // 1. Try email match
-        // 2. If no email match, try full name match (failsafe)
-        let member = members.find(m => m.email?.toLowerCase().trim() === input);
+        setLoading(false);
 
-        if (!member) {
-            member = members.find(m =>
-                `${m.firstName} ${m.lastName}`.toLowerCase().trim() === input
-            );
-        }
-
-        if (member && (member.password === password || member.password === undefined)) {
-            onLogin(member);
-        } else {
+        if (rpcError || !data || data.length === 0) {
             setError('Invalid credentials. If you do not have an email on file, try your full name.');
+            return;
         }
+
+        const row = data[0];
+        const member: Member = {
+            id: row.id,
+            firstName: row.first_name,
+            lastName: row.last_name,
+            role: row.role as Role,
+            yearsInBPLT: row.years_in_bplt,
+            email: row.email,
+            fallSportId: row.fall_sport_id,
+            springSportId: row.spring_sport_id,
+            isChair: row.is_chair,
+        };
+
+        onLogin(member, password);
     };
 
     const recentSelfies = selfies
@@ -126,7 +140,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                     onChange={(e) => setPassword(e.target.value)}
                                     autoComplete="new-password"
                                 />
-                                <button type="submit" className="w-full bg-[#FFB81C] text-[#154734] py-4 rounded-xl font-extrabold text-xl hover:bg-white transition-colors shadow-lg mt-4">Sign In</button>
+                                <button type="submit" disabled={loading} className="w-full bg-[#FFB81C] text-[#154734] py-4 rounded-xl font-extrabold text-xl hover:bg-white transition-colors shadow-lg mt-4 disabled:opacity-60">{loading ? 'Signing In...' : 'Sign In'}</button>
                                 {error && <p className="text-red-300 text-sm text-center font-bold animate-pulse bg-red-900/20 p-2 rounded">{error}</p>}
                             </form>
                         </div>
