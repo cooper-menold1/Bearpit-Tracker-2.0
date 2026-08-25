@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Member, Game, Role, Selfie, Sport } from '../types';
+import { Member, Game, Selfie, Sport } from '../types';
 import { CheckCircle2, User, Calendar, Trophy, Camera, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { VENUES } from '../constants';
 import { getDistance, getCurrentPosition } from '../utils/location';
@@ -16,8 +16,8 @@ interface AttendanceFormProps {
 export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, sports, onSubmit, onBack }) => {
     const [step, setStep] = useState(1);
     const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
     const [matchedMember, setMatchedMember] = useState<Member | null>(null);
+    const [notFound, setNotFound] = useState(false);
     const [selectedGameId, setSelectedGameId] = useState('');
 
     const selectedGame = games.find(g => g.id === selectedGameId);
@@ -111,25 +111,19 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
     const handleNameNext = (e: React.FormEvent) => {
         e.preventDefault();
+        setNotFound(false);
         const found = members.find(m =>
             `${m.firstName} ${m.lastName}`.toLowerCase() === name.toLowerCase().trim()
         );
 
         if (found) {
             setMatchedMember(found);
-            setStep(3); // Skip email
+            setStep(2);
         } else {
-            setStep(2); // Go to email
+            // No self-service capture here anymore -- new people go through
+            // the dedicated "Interested in Joining?" form instead.
+            setNotFound(true);
         }
-    };
-
-    const handleEmailNext = (e: React.FormEvent) => {
-        e.preventDefault();
-        const foundByEmail = members.find(m => m.email?.toLowerCase() === email.toLowerCase().trim());
-        if (foundByEmail) {
-            setMatchedMember(foundByEmail);
-        }
-        setStep(3);
     };
 
     const handleSelfieCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,22 +160,9 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedGameId) return;
+        if (!selectedGameId || !matchedMember) return;
 
-        const finalMemberId = matchedMember ? matchedMember.id : `new_${Date.now()}`;
-        let newMember: Member | undefined = undefined;
-
-        if (!matchedMember) {
-            const [first, ...last] = name.split(' ');
-            newMember = {
-                id: finalMemberId,
-                firstName: first || name,
-                lastName: last.join(' ') || '',
-                role: Role.PROSPECTIVE,
-                yearsInBPLT: 0,
-                email: email
-            };
-        }
+        const finalMemberId = matchedMember.id;
 
         const selfieObjects: Selfie[] = selfiesData.map((data, idx) => ({
             id: `selfie_${Date.now()}_${idx}`,
@@ -191,7 +172,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
             timestamp: new Date().toISOString()
         }));
 
-        onSubmit(selectedGameId, finalMemberId, newMember, selfieObjects as any);
+        onSubmit(selectedGameId, finalMemberId, undefined, selfieObjects as any);
         setSubmitted(true);
     };
 
@@ -202,14 +183,8 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                     <div className="w-16 h-16 bg-green-100 text-[#154734] rounded-full flex items-center justify-center mx-auto mb-4">
                         <CheckCircle2 className="w-8 h-8" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                        {matchedMember ? "Sic 'Em!" : "Info Captured"}
-                    </h2>
-                    <p className="text-gray-600 mb-6">
-                        {matchedMember
-                            ? "Your attendance has been recorded."
-                            : "Thanks! We've saved your info and will reach out soon."}
-                    </p>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Sic 'Em!</h2>
+                    <p className="text-gray-600 mb-6">Your attendance has been recorded.</p>
                     <button
                         onClick={() => window.location.reload()}
                         className="text-[#154734] hover:text-[#FFB81C] font-bold transition-colors"
@@ -240,7 +215,6 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                     <div className="flex gap-2 mb-6">
                         <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? 'bg-[#154734]' : 'bg-gray-200'}`}></div>
                         <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? 'bg-[#154734]' : 'bg-gray-200'}`}></div>
-                        <div className={`h-1.5 flex-1 rounded-full ${step >= 3 ? 'bg-[#154734]' : 'bg-gray-200'}`}></div>
                     </div>
 
                     {step === 1 && (
@@ -253,13 +227,22 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                         type="text"
                                         required
                                         value={name}
-                                        onChange={e => setName(e.target.value)}
+                                        onChange={e => { setName(e.target.value); setNotFound(false); }}
                                         className="pl-10 w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
                                         placeholder="First Last"
                                     />
                                 </div>
                                 <p className="text-xs text-gray-500 mt-2">Please use the name you registered with.</p>
                             </div>
+
+                            {notFound && (
+                                <div className="bg-amber-50 p-3 rounded-lg text-sm text-amber-800 border border-amber-100">
+                                    We couldn't find <strong>{name}</strong> in our records. This form is for
+                                    existing members only -- if you're new, use the <strong>"Interested in
+                                    Joining?"</strong> option on the login page instead.
+                                </div>
+                            )}
+
                             <button
                                 onClick={handleNameNext}
                                 disabled={!name.trim()}
@@ -271,32 +254,6 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                     )}
 
                     {step === 2 && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800 mb-4 border border-blue-100">
-                                We couldn't find <strong>{name}</strong> in our records. Please provide your Baylor email to continue.
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Your Baylor Email</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={e => setEmail(e.target.value)}
-                                    className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
-                                    placeholder="first_last1@baylor.edu"
-                                />
-                            </div>
-                            <button
-                                onClick={handleEmailNext}
-                                disabled={!email.includes('@')}
-                                className="w-full bg-[#154734] text-white py-3 rounded-lg font-bold hover:bg-[#0f3325] disabled:opacity-50 transition-colors"
-                            >
-                                Next
-                            </button>
-                        </div>
-                    )}
-
-                    {step === 3 && (
                         <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Current Date</label>

@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { Management } from './components/Management';
 import { Login } from './components/Login';
 import { AttendanceForm } from './components/AttendanceForm';
+import { InterestForm } from './components/InterestForm';
 import { MemberPortal } from './components/MemberPortal';
 import { Instructions } from './components/Instructions';
 import { QRCodeDisplay } from './components/QRCodeDisplay';
@@ -70,7 +71,7 @@ function App() {
     const [showChantManager, setShowChantManager] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-    const [mode, setMode] = useState<'login' | 'dashboard' | 'member' | 'form' | 'chants'>(() => {
+    const [mode, setMode] = useState<'login' | 'dashboard' | 'member' | 'form' | 'chants' | 'interest'>(() => {
         const savedMode = sessionStorage.getItem('bp_mode');
         return (savedMode as any) || 'login';
     });
@@ -109,7 +110,7 @@ function App() {
                 supabase.from('sports').select('*'),
                 supabase.from('games').select('*'),
                 // SECURITY FLAGGED: Do not select password column for all users
-                supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, fall_sport_id, spring_sport_id, is_chair'),
+                supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, phone, year, fall_sport_id, spring_sport_id, is_chair'),
                 supabase.from('attendance').select('*'),
                 supabase.from('selfies').select('*'),
                 supabase.from('bonus_points').select('*'),
@@ -132,6 +133,8 @@ function App() {
                 yearsInBPLT: m.years_in_bplt,
                 password: m.password, // This will be undefined now, which is safer
                 email: m.email,
+                phone: m.phone,
+                year: m.year,
                 fallSportId: m.fall_sport_id,
                 springSportId: m.spring_sport_id,
                 isChair: m.is_chair
@@ -313,7 +316,7 @@ function App() {
         // is a safe no-op for existing members who already have one.
         //
         // Skipped entirely for Prospective role: this same function is called
-        // from the public self-service check-in form (AttendanceForm), where
+        // from the public self-service "Interested in Joining?" form, where
         // the person submitting IS the new record -- they'd see their own
         // "temporary password" alert on their own phone, which is confusing
         // and pointless (prospects don't log in). Real members only get a
@@ -326,6 +329,8 @@ function App() {
             years_in_bplt: newMember.yearsInBPLT,
             email: newMember.email
         };
+        if (newMember.phone !== undefined) payload.phone = newMember.phone;
+        if (newMember.year !== undefined) payload.year = newMember.year;
 
         const { error } = await supabase.from('members').upsert(payload);
         if (error) { alert('Error saving member: ' + error.message); return; }
@@ -467,8 +472,9 @@ function App() {
 
     if (isLoading) return <div className="h-screen bg-[#154734] flex items-center justify-center text-white"><RefreshCw className="w-10 h-10 animate-spin" /></div>;
     if (mode === 'chants') return <ChantGallery onBack={() => setMode('login')} />;
-    if (mode === 'login') return <Login members={data.members} onLogin={handleLogin} onGuest={handleGuestForm} onChants={() => setMode('chants')} selfies={data.selfies} />;
+    if (mode === 'login') return <Login members={data.members} onLogin={handleLogin} onGuest={handleGuestForm} onChants={() => setMode('chants')} onInterest={() => setMode('interest')} selfies={data.selfies} />;
     if (mode === 'form') return <AttendanceForm members={data.members} games={data.games} sports={data.sports} onSubmit={handleFormSubmit} onBack={handleLogout} />;
+    if (mode === 'interest') return <InterestForm onSubmit={handleAddMember} onBack={handleLogout} />;
     if (mode === 'member' && currentMember) return <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} />;
 
     return (

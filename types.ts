@@ -14,6 +14,8 @@ export interface Member {
     yearsInBPLT: number;
     password?: string;
     email?: string;
+    phone?: string;
+    year?: string; // class year, e.g. "Freshman" -- only meaningful pre-induction
     fallSportId?: string;
     springSportId?: string;
     isChair?: boolean;

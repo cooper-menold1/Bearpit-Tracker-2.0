@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Member, Selfie, Role } from '../types';
-import { Music, QrCode, User } from 'lucide-react';
+import { Music, QrCode, User, UserPlus, X } from 'lucide-react';
 import LOGO_V2 from '../assets/bearpit_logo_v2.png';
 import { supabase } from '../utils/supabaseClient';
 
@@ -10,14 +10,16 @@ interface LoginProps {
     onLogin: (member: Member, password: string) => void;
     onGuest: () => void;
     onChants: () => void;
+    onInterest: () => void;
     selfies: Selfie[];
 }
 
-export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChants, selfies }) => {
+export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChants, onInterest, selfies }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPortal, setShowPortal] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,6 +77,12 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                 <div className="relative z-10 px-8 transform hover:scale-105 transition-transform duration-500">
                     <img src={LOGO_V2} alt="The BearPit" className="w-full max-w-xl drop-shadow-2xl" />
                 </div>
+                <button
+                    onClick={() => setShowPortal(true)}
+                    className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-[#FFB81C]/40 text-[#FFB81C] text-sm font-bold px-4 py-2 rounded-full backdrop-blur-sm transition-colors"
+                >
+                    <User className="w-4 h-4" /> Member Portal
+                </button>
             </div>
 
             <div className="relative z-10 bg-gray-50 flex flex-col items-center w-full shadow-[0_-20px_50px_rgba(0,0,0,0.3)]">
@@ -96,6 +104,22 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                             </div>
                         </button>
 
+                        <button onClick={onInterest} className="bg-[#154734] group relative overflow-hidden rounded-3xl shadow-2xl hover:shadow-[0_20px_60px_rgba(21,71,52,0.4)] transition-all duration-300 transform hover:-translate-y-2 border border-[#FFB81C]/20 flex flex-col h-[600px]">
+                            <div className="absolute -right-12 -top-12 text-[#FFB81C] opacity-10 group-hover:opacity-20 transition-opacity duration-500 transform group-hover:-rotate-12">
+                                <UserPlus className="w-80 h-80" />
+                            </div>
+                            <div className="absolute top-0 left-0 w-2 h-full bg-[#FFB81C] group-hover:w-4 transition-all duration-300" />
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 text-center space-y-8">
+                                <div className="bg-[#FFB81C] p-8 rounded-full text-[#154734] shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                    <UserPlus className="w-16 h-16" />
+                                </div>
+                                <div>
+                                    <h3 className="text-4xl font-extrabold text-[#FFB81C] mb-4 tracking-tight">Interested in<br />Joining?</h3>
+                                    <p className="text-white/80 font-medium text-lg leading-relaxed">Tell us a bit about yourself and we'll be in touch.</p>
+                                </div>
+                            </div>
+                        </button>
+
                         <button onClick={onGuest} className="bg-[#154734] group relative overflow-hidden rounded-3xl shadow-2xl hover:shadow-[0_20px_60px_rgba(21,71,52,0.4)] transition-all duration-300 transform hover:-translate-y-2 border border-[#FFB81C]/20 flex flex-col h-[600px]">
                             <div className="absolute -right-12 -top-12 text-[#FFB81C] opacity-10 group-hover:opacity-20 transition-opacity duration-500 transform group-hover:-rotate-12">
                                 <QrCode className="w-80 h-80" />
@@ -111,39 +135,6 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                 </div>
                             </div>
                         </button>
-
-                        <div className="bg-[#154734] rounded-3xl shadow-2xl border border-[#FFB81C]/20 p-8 h-[600px] flex flex-col justify-center relative overflow-hidden">
-                            <div className="absolute -right-8 -bottom-8 text-[#FFB81C] opacity-5">
-                                <User className="w-64 h-64" />
-                            </div>
-                            <div className="text-center mb-10 relative z-10">
-                                <div className="bg-[#FFB81C] p-6 rounded-full text-[#154734] shadow-lg w-20 h-20 mx-auto flex items-center justify-center mb-6">
-                                    <User className="w-10 h-10" />
-                                </div>
-                                <h3 className="text-3xl font-extrabold text-[#FFB81C] mb-2">Member Portal</h3>
-                                <p className="text-white/70 text-sm">Enter Baylor Email or Full Name</p>
-                            </div>
-                            <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
-                                <input
-                                    type="text"
-                                    placeholder="Email or Full Name"
-                                    className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    autoComplete="off"
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Password"
-                                    className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    autoComplete="new-password"
-                                />
-                                <button type="submit" disabled={loading} className="w-full bg-[#FFB81C] text-[#154734] py-4 rounded-xl font-extrabold text-xl hover:bg-white transition-colors shadow-lg mt-4 disabled:opacity-60">{loading ? 'Signing In...' : 'Sign In'}</button>
-                                {error && <p className="text-red-300 text-sm text-center font-bold animate-pulse bg-red-900/20 p-2 rounded">{error}</p>}
-                            </form>
-                        </div>
                     </div>
                 </div>
 
@@ -165,6 +156,50 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                     <p>&copy; {new Date().getFullYear()} Baylor BearPit. All rights reserved.</p>
                 </div>
             </div>
+
+            {showPortal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#154734] rounded-3xl shadow-2xl border border-[#FFB81C]/20 p-8 max-w-md w-full relative overflow-hidden">
+                        <button
+                            onClick={() => setShowPortal(false)}
+                            className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                        <div className="absolute -right-8 -bottom-8 text-[#FFB81C] opacity-5">
+                            <User className="w-64 h-64" />
+                        </div>
+                        <div className="text-center mb-10 relative z-10">
+                            <div className="bg-[#FFB81C] p-6 rounded-full text-[#154734] shadow-lg w-20 h-20 mx-auto flex items-center justify-center mb-6">
+                                <User className="w-10 h-10" />
+                            </div>
+                            <h3 className="text-3xl font-extrabold text-[#FFB81C] mb-2">Member Portal</h3>
+                            <p className="text-white/70 text-sm">Enter Baylor Email or Full Name</p>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
+                            <input
+                                type="text"
+                                placeholder="Email or Full Name"
+                                className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                autoComplete="off"
+                                autoFocus
+                            />
+                            <input
+                                type="password"
+                                placeholder="Password"
+                                className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                autoComplete="new-password"
+                            />
+                            <button type="submit" disabled={loading} className="w-full bg-[#FFB81C] text-[#154734] py-4 rounded-xl font-extrabold text-xl hover:bg-white transition-colors shadow-lg mt-4 disabled:opacity-60">{loading ? 'Signing In...' : 'Sign In'}</button>
+                            {error && <p className="text-red-300 text-sm text-center font-bold animate-pulse bg-red-900/20 p-2 rounded">{error}</p>}
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

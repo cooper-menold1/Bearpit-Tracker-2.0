@@ -165,36 +165,28 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-[#154734]">Membership Applications</h2>
-                        <p className="text-gray-500 text-sm">Prospective members who captured info at a game.</p>
+                        <p className="text-gray-500 text-sm">People who filled out "Interested in Joining?"</p>
                     </div>
                 </div>
                 <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 text-gray-700 uppercase text-xs">
                         <tr>
-                            <th className="px-6 py-3">Timestamp / Date</th>
                             <th className="px-6 py-3">Name</th>
                             <th className="px-6 py-3">Email</th>
-                            <th className="px-6 py-3">Game Attended</th>
+                            <th className="px-6 py-3">Phone</th>
+                            <th className="px-6 py-3">Year</th>
                             <th className="px-6 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {prospective.map(m => {
-                            const gameId = Object.keys(data.attendance).find(gid => data.attendance[gid][m.id]);
-                            const game = data.games.find(g => g.id === gameId);
                             const mailtoHref = data.emailTemplate && m.email ? buildMailto(data.emailTemplate, m) : undefined;
                             return (
                                 <tr key={m.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-gray-500">{game ? game.date : 'Unknown'}</td>
                                     <td className="px-6 py-4 font-bold text-gray-900">{m.firstName} {m.lastName}</td>
                                     <td className="px-6 py-4 text-blue-600">{m.email || 'No Email'}</td>
-                                    <td className="px-6 py-4">
-                                        {game ? (
-                                            <span className="flex items-center gap-1">
-                                                {game.opponent} <span className="text-xs text-gray-400">({game.sportId})</span>
-                                            </span>
-                                        ) : 'No Attendance Found'}
-                                    </td>
+                                    <td className="px-6 py-4 text-gray-500">{m.phone || '—'}</td>
+                                    <td className="px-6 py-4 text-gray-500">{m.year || '—'}</td>
                                     <td className="px-6 py-4 text-right whitespace-nowrap">
                                         {mailtoHref ? (
                                             <a
