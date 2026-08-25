@@ -73,6 +73,16 @@ export interface Settings {
     publicUrl?: string;
 }
 
+export interface EmailTemplate {
+    id: string;
+    subject: string;
+    body: string; // supports {{first_name}}, {{meeting_type}}, {{date}}, {{time}}, {{location}}
+    meetingType?: string;
+    meetingDate?: string;
+    meetingTime?: string;
+    meetingLocation?: string;
+}
+
 // Map of gameId -> { memberId -> attended (boolean) }
 export interface AttendanceRecord {
     [gameId: string]: {
@@ -89,6 +99,7 @@ export interface AppState {
     bonusPoints: BonusPoint[]; // New field
     selfieVotes: SelfieVote[]; // New field
     settings: Settings;
+    emailTemplate: EmailTemplate | null;
 }
 
 export interface Chant {

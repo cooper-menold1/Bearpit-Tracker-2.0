@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { INITIAL_STATE, LOGO_URL } from './constants';
-import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote } from './types';
+import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate } from './types';
 import { SportSheet } from './components/SportSheet';
 import { Dashboard } from './components/Dashboard';
 import { Management } from './components/Management';
@@ -16,6 +16,7 @@ import { Leaderboard } from './components/Leaderboard';
 import { SettingsModal } from './components/SettingsModal';
 import { ChantGallery } from './components/ChantGallery';
 import { ChantManager } from './components/ChantManager';
+import { ApplicationsList } from './components/ApplicationsList';
 import { supabase } from './utils/supabaseClient';
 import {
     LayoutDashboard,
@@ -31,7 +32,8 @@ import {
     TableProperties,
     RefreshCw,
     Music,
-    User
+    User,
+    Mail
 } from 'lucide-react';
 
 const getSportIcon = (id: string) => {
@@ -91,58 +93,6 @@ function App() {
         setShowChantManager(false);
     }, [currentMember, mode]);
 
-    const ApplicationsList = () => {
-        const prospective = data.members.filter(m => m.role === Role.PROSPECTIVE);
-        return (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-lg text-blue-700">
-                        <Users className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-[#154734]">Membership Applications</h2>
-                        <p className="text-gray-500 text-sm">Prospective members who captured info at a game.</p>
-                    </div>
-                </div>
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-700 uppercase text-xs">
-                        <tr>
-                            <th className="px-6 py-3">Timestamp / Date</th>
-                            <th className="px-6 py-3">Name</th>
-                            <th className="px-6 py-3">Email</th>
-                            <th className="px-6 py-3">Game Attended</th>
-                            <th className="px-6 py-3 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {prospective.map(m => {
-                            const gameId = Object.keys(data.attendance).find(gid => data.attendance[gid][m.id]);
-                            const game = data.games.find(g => g.id === gameId);
-                            return (
-                                <tr key={m.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-gray-500">{game ? game.date : 'Unknown'}</td>
-                                    <td className="px-6 py-4 font-bold text-gray-900">{m.firstName} {m.lastName}</td>
-                                    <td className="px-6 py-4 text-blue-600">{m.email || 'No Email'}</td>
-                                    <td className="px-6 py-4">
-                                        {game ? (
-                                            <span className="flex items-center gap-1">
-                                                {game.opponent} <span className="text-xs text-gray-400">({game.sportId})</span>
-                                            </span>
-                                        ) : 'No Attendance Found'}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <button onClick={() => handleAddMember({ ...m, role: Role.MEMBER })} className="text-green-600 hover:text-green-800 font-bold mr-3">Approve</button>
-                                        <button onClick={() => handleDeleteMember(m.id)} className="text-red-500 hover:text-red-700">Reject</button>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        );
-    };
-
     const fetchData = async () => {
         setSyncStatus('syncing');
         try {
@@ -153,7 +103,8 @@ function App() {
                 { data: attendance },
                 { data: selfies },
                 { data: bonusPoints },
-                { data: selfieVotes }
+                { data: selfieVotes },
+                { data: emailTemplateRow }
             ] = await Promise.all([
                 supabase.from('sports').select('*'),
                 supabase.from('games').select('*'),
@@ -162,7 +113,9 @@ function App() {
                 supabase.from('attendance').select('*'),
                 supabase.from('selfies').select('*'),
                 supabase.from('bonus_points').select('*'),
-                supabase.from('selfie_votes').select('*')
+                supabase.from('selfie_votes').select('*'),
+                // Falls back to null if the migration hasn't been run yet -- not fatal.
+                supabase.from('email_templates').select('*').eq('id', 'prospective_welcome').maybeSingle()
             ]);
 
             const attendanceMap: Record<string, Record<string, boolean>> = {};
@@ -211,6 +164,16 @@ function App() {
                 venueIds: s.venue_ids || []
             }));
 
+            const mappedEmailTemplate: EmailTemplate | null = emailTemplateRow ? {
+                id: emailTemplateRow.id,
+                subject: emailTemplateRow.subject,
+                body: emailTemplateRow.body,
+                meetingType: emailTemplateRow.meeting_type,
+                meetingDate: emailTemplateRow.meeting_date,
+                meetingTime: emailTemplateRow.meeting_time,
+                meetingLocation: emailTemplateRow.meeting_location
+            } : null;
+
             setData(prev => ({
                 ...prev,
                 members: mappedMembers,
@@ -219,7 +182,8 @@ function App() {
                 sports: mappedSports,
                 selfies: mappedSelfies,
                 selfieVotes: (selfieVotes || []).map((v: any) => ({ selfieId: v.selfie_id, memberId: v.member_id })),
-                bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date }))
+                bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date })),
+                emailTemplate: mappedEmailTemplate
             }));
 
             setSyncStatus('success');
@@ -240,6 +204,7 @@ function App() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => fetchData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'sports' }, () => fetchData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'selfies' }, () => fetchData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'email_templates' }, () => fetchData())
             .subscribe();
         return () => { supabase.removeChannel(channels); };
     }, []);
@@ -376,6 +341,20 @@ function App() {
         if (window.confirm("Are you sure?")) await supabase.from('members').delete().eq('id', id);
     };
 
+    const handleSaveEmailTemplate = async (template: EmailTemplate) => {
+        const { error } = await supabase.from('email_templates').upsert({
+            id: template.id,
+            subject: template.subject,
+            body: template.body,
+            meeting_type: template.meetingType,
+            meeting_date: template.meetingDate || null,
+            meeting_time: template.meetingTime,
+            meeting_location: template.meetingLocation
+        });
+        if (error) { alert('Error saving template: ' + error.message); return; }
+        fetchData();
+    };
+
     const handleAddGame = async (game: Game) => {
         await supabase.from('games').upsert({
             id: game.id,
@@ -426,7 +405,17 @@ function App() {
         if (isLoading) return <div className="flex items-center justify-center h-full"><RefreshCw className="w-8 h-8 animate-spin text-green-700" /></div>;
         if (currentView === 'dashboard') return <Dashboard data={data} />;
         if (currentView === 'points') return <Leaderboard data={data} />;
-        if (currentView === 'applications') return <ApplicationsList />;
+        if (currentView === 'applications') return (
+            <ApplicationsList
+                data={data}
+                onApprove={(memberId) => {
+                    const m = data.members.find(mem => mem.id === memberId);
+                    if (m) handleAddMember({ ...m, role: Role.MEMBER });
+                }}
+                onReject={handleDeleteMember}
+                onSaveTemplate={handleSaveEmailTemplate}
+            />
+        );
         if (currentView === 'management') return (
             <Management
                 members={data.members}
@@ -487,6 +476,15 @@ function App() {
                 <nav className="p-0 space-y-1 mt-2">
                     <button onClick={() => setCurrentView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 ${currentView === 'dashboard' ? 'bg-[#FFB81C] text-[#154734] font-bold' : 'text-gray-300'}`}><LayoutDashboard className="w-5 h-5" />{isSidebarOpen && <span>Dashboard</span>}</button>
                     <button onClick={() => setCurrentView('management')} className={`w-full flex items-center gap-3 px-4 py-3 ${currentView === 'management' ? 'bg-[#FFB81C] text-[#154734] font-bold' : 'text-gray-300'}`}><Users className="w-5 h-5" />{isSidebarOpen && <span>Manage</span>}</button>
+                    <button onClick={() => setCurrentView('applications')} className={`w-full flex items-center gap-3 px-4 py-3 ${currentView === 'applications' ? 'bg-[#FFB81C] text-[#154734] font-bold' : 'text-gray-300'}`}>
+                        <Mail className="w-5 h-5" />
+                        {isSidebarOpen && <span>Applications</span>}
+                        {data.members.filter(m => m.role === Role.PROSPECTIVE).length > 0 && (
+                            <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${currentView === 'applications' ? 'bg-[#154734] text-white' : 'bg-[#FFB81C] text-[#154734]'} ${isSidebarOpen ? 'ml-auto' : ''}`}>
+                                {data.members.filter(m => m.role === Role.PROSPECTIVE).length}
+                            </span>
+                        )}
+                    </button>
                     <button onClick={() => setCurrentView('points')} className={`w-full flex items-center gap-3 px-4 py-3 ${currentView === 'points' ? 'bg-[#FFB81C] text-[#154734] font-bold' : 'text-gray-300'}`}><TableProperties className="w-5 h-5" />{isSidebarOpen && <span>Standings</span>}</button>
                     {data.sports?.map(sport => (<button key={sport.id} onClick={() => setCurrentView(sport.id)} className={`w-full flex items-center gap-3 px-4 py-3 ${currentView === sport.id ? 'bg-[#FFB81C] text-[#154734] font-bold' : 'text-gray-300'}`}>{getSportIcon(sport.id)}{isSidebarOpen && <span>{sport.name}</span>}</button>))}
                 </nav>
