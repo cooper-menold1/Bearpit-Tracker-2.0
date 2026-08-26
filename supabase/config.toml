@@ -1,0 +1,4 @@
+[functions.autofill-schedule]
+# Invoked only by the pg_cron job (supabase/migrations/20260826_schedule_autofill_cron.sql),
+# never by the browser, so it doesn't need a user JWT.
+verify_jwt = false
