@@ -28,21 +28,21 @@ interface ScrapedGame {
   description: string;
 }
 
-async function fetchMonth(year: number, month: number): Promise<ScrapedGame[]> {
-  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  const url = `https://baylorbears.com/api/v2/Calendar/from/${startDate}/to/${endDate}`;
+// Public CORS-proxy fallback, same set utils/scraper.ts uses client-side.
+// baylorbears.com (Cloudflare) 403s Supabase Edge Functions' own egress IPs
+// even with browser-like headers — confirmed 2026-08-26, direct fetch works
+// fine from other networks but not from here — so a direct attempt is tried
+// first (fast, no third-party dependency when it works), and these proxies
+// are the fallback since they're already proven to get through from the
+// client's AutoFillModal.
+const PROXIES = [
+  (url: string) => `https://cors-get-proxy.sirjosh.workers.dev/?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+];
 
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; BearPitTracker/1.0; +https://baylor-bearpit.web.app/)",
-      "Referer": "https://baylorbears.com/",
-      "Accept": "application/json",
-    },
-  });
-  if (!res.ok) throw new Error(`baylorbears.com fetch failed: HTTP ${res.status}`);
-  const contents = await res.json();
+function parseCalendarPayload(contents: any): ScrapedGame[] {
   if (!Array.isArray(contents)) throw new Error("Unexpected response shape from baylorbears.com");
 
   const games: ScrapedGame[] = [];
@@ -72,6 +72,55 @@ async function fetchMonth(year: number, month: number): Promise<ScrapedGame[]> {
   return games.filter((g) => g.opponent && g.opponent.toLowerCase() !== "baylor");
 }
 
+async function fetchMonth(year: number, month: number, log: string[]): Promise<ScrapedGame[]> {
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  const baseUrl = `https://baylorbears.com/api/v2/Calendar/from/${startDate}/to/${endDate}`;
+
+  // 1. Direct attempt.
+  try {
+    const res = await fetch(baseUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Referer": "https://baylorbears.com/",
+        "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return parseCalendarPayload(await res.json());
+  } catch (directErr) {
+    log.push(`Direct fetch for ${year}-${month} failed (${directErr}), falling back to proxies`);
+  }
+
+  // 2. Proxy fallback chain.
+  let lastError: unknown = null;
+  for (const proxyFn of PROXIES) {
+    const proxyUrl = proxyFn(baseUrl);
+    try {
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      let contents = data.contents;
+      if (typeof contents === "string") {
+        try { contents = JSON.parse(contents); } catch { /* ignore */ }
+      }
+      if (!contents) contents = data;
+      if (contents?.Error) { lastError = new Error(contents.Error); continue; }
+      if (!Array.isArray(contents)) { lastError = new Error("Unexpected proxy payload shape"); continue; }
+
+      return parseCalendarPayload(contents);
+    } catch (err) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw lastError || new Error(`All fetch attempts failed for ${year}-${month}`);
+}
+
 Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const log: string[] = [];
@@ -88,7 +137,7 @@ Deno.serve(async () => {
     const scraped: ScrapedGame[] = [];
     for (let i = 0; i < 3; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      scraped.push(...(await fetchMonth(d.getFullYear(), d.getMonth() + 1)));
+      scraped.push(...(await fetchMonth(d.getFullYear(), d.getMonth() + 1, log)));
     }
 
     const sports = existingSports ?? [];
