@@ -43,7 +43,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ isOpen, onClose, p
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full text-center overflow-hidden flex flex-col">
                 <div className="bg-[#154734] p-6 flex justify-between items-center text-white shrink-0">
-                    <h2 className="font-bold text-xl uppercase tracking-wider">Bear Pit QR Code</h2>
+                    <h2 className="font-bold text-xl uppercase tracking-wider">BearPit QR Code</h2>
                     <button onClick={onClose} className="hover:bg-white/10 rounded-full p-1 transition-colors">
                         <X className="w-6 h-6" />
                     </button>
@@ -62,7 +62,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ isOpen, onClose, p
                     <div className="space-y-2">
                         <p className="text-[#154734] font-bold text-lg">Direct Access</p>
                         <p className="text-gray-500 text-sm">
-                            Scan to open the Bear Pit Landing Page for chants and attendance.
+                            Scan to open the BearPit Landing Page for chants and attendance.
                         </p>
                     </div>
 

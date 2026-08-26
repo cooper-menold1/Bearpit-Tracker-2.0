@@ -485,7 +485,7 @@ function App() {
                 <div className="p-4 border-b border-green-900/50 flex items-center justify-between shrink-0 sticky top-0 bg-[#154734] z-10">
                     <div className="font-bold flex items-center gap-3 overflow-hidden whitespace-nowrap">
                         <div className="w-8 h-8 bg-white rounded flex items-center justify-center shrink-0 p-1"><img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" /></div>
-                        {isSidebarOpen && <span>Bear Pit Tracker</span>}
+                        {isSidebarOpen && <span>BearPit Tracker</span>}
                     </div>
                 </div>
                 <nav className="p-0 space-y-1 mt-2">

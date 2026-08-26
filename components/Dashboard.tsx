@@ -105,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Bear_Pit_Data_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `BearPit_Data_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

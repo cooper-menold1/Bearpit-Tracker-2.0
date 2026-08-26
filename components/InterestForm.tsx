@@ -67,7 +67,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">You're on the list!</h2>
                     <p className="text-gray-600 mb-6">
-                        Thanks for your interest in Bear Pit. Keep an eye on your Baylor email -- we'll follow up
+                        Thanks for your interest in BearPit. Keep an eye on your Baylor email -- we'll follow up
                         with the next meeting or intersession time.
                     </p>
                     <button
@@ -94,7 +94,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                 <div className="bg-[#FFB81C] p-4 text-center">
                     <div className="flex items-center justify-center gap-2 mb-1">
                         <UserPlus className="w-5 h-5 text-[#154734]" />
-                        <h1 className="text-xl font-bold text-[#154734]">Interested in Joining Bear Pit?</h1>
+                        <h1 className="text-xl font-bold text-[#154734]">Interested in Joining BearPit?</h1>
                     </div>
                     <p className="text-[#154734] text-sm font-semibold opacity-90">Takes less than a minute</p>
                 </div>
@@ -183,7 +183,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
 
                     {existingMember && (
                         <div className="bg-amber-50 p-3 rounded-lg text-sm text-amber-800 border border-amber-100">
-                            Looks like you're already a Bear Pit member! No need to fill this out -- use the{' '}
+                            Looks like you're already a BearPit member! No need to fill this out -- use the{' '}
                             <strong>Member Portal</strong> (top right of the login page) to sign in instead.
                         </div>
                     )}
