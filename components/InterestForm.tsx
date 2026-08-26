@@ -9,6 +9,7 @@ interface InterestFormProps {
 }
 
 const YEAR_OPTIONS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Grad Student'];
+const HEARD_OPTIONS = ['A game', 'Late Night', 'A friend / word of mouth', 'Instagram', 'Other'];
 
 // Public "I'm interested" form -- separate from AttendanceForm (which is
 // now for existing members checking in at a game only). This is the
@@ -20,6 +21,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ onSubmit, onBack }) 
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [year, setYear] = useState('');
+    const [heardAbout, setHeardAbout] = useState('');
     const [submitted, setSubmitted] = useState(false);
 
     const emailValid = email.toLowerCase().endsWith('@baylor.edu');
@@ -36,6 +38,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ onSubmit, onBack }) 
             email: email.trim(),
             phone: phone.trim() || undefined,
             year: year || undefined,
+            heardAbout: heardAbout || undefined,
             role: Role.PROSPECTIVE,
             yearsInBPLT: 0,
         });
@@ -148,6 +151,20 @@ export const InterestForm: React.FC<InterestFormProps> = ({ onSubmit, onBack }) 
                         >
                             <option value="">-- Select --</option>
                             {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">
+                            How did you hear about us? <span className="text-gray-400 font-normal">(optional)</span>
+                        </label>
+                        <select
+                            value={heardAbout}
+                            onChange={e => setHeardAbout(e.target.value)}
+                            className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
+                        >
+                            <option value="">-- Select --</option>
+                            {HEARD_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
                         </select>
                     </div>
 

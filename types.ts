@@ -16,6 +16,7 @@ export interface Member {
     email?: string;
     phone?: string;
     year?: string; // class year, e.g. "Freshman" -- only meaningful pre-induction
+    heardAbout?: string; // how a prospect heard about Bear Pit -- only meaningful pre-induction
     fallSportId?: string;
     springSportId?: string;
     isChair?: boolean;

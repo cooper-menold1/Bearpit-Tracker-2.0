@@ -123,7 +123,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-[#FFB81C] text-[#154734] rounded-lg flex items-center justify-center font-bold text-xl shadow-sm">BP</div>
                         <div>
-                            <h1 className="text-lg font-bold leading-tight">BearPit Tracker</h1>
+                            <h1 className="text-lg font-bold leading-tight">Bear Pit Tracker</h1>
                             <p className="text-xs text-[#FFB81C] font-medium">Member Portal</p>
                         </div>
                     </div>

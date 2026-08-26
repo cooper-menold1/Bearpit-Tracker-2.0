@@ -208,7 +208,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
             <div className="w-full max-w-lg bg-white rounded-xl shadow-lg overflow-hidden border-2 border-[#FFB81C]">
                 <div className="bg-[#FFB81C] p-4 text-center">
                     <h1 className="text-xl font-bold text-[#154734]">Attendance Check-in</h1>
-                    <p className="text-[#154734] text-sm font-semibold opacity-90">BearPit Club</p>
+                    <p className="text-[#154734] text-sm font-semibold opacity-90">Bear Pit</p>
                 </div>
 
                 <form className="p-6 space-y-6">

@@ -175,6 +175,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             <th className="px-6 py-3">Email</th>
                             <th className="px-6 py-3">Phone</th>
                             <th className="px-6 py-3">Year</th>
+                            <th className="px-6 py-3">Heard About</th>
                             <th className="px-6 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -187,6 +188,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                                     <td className="px-6 py-4 text-blue-600">{m.email || 'No Email'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.phone || '—'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.year || '—'}</td>
+                                    <td className="px-6 py-4 text-gray-500">{m.heardAbout || '—'}</td>
                                     <td className="px-6 py-4 text-right whitespace-nowrap">
                                         {mailtoHref ? (
                                             <a
@@ -208,7 +210,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             );
                         })}
                         {prospective.length === 0 && (
-                            <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400 italic">No pending applications.</td></tr>
+                            <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-400 italic">No pending applications.</td></tr>
                         )}
                     </tbody>
                 </table>

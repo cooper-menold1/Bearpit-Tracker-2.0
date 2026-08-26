@@ -110,7 +110,7 @@ function App() {
                 supabase.from('sports').select('*'),
                 supabase.from('games').select('*'),
                 // SECURITY FLAGGED: Do not select password column for all users
-                supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, phone, year, fall_sport_id, spring_sport_id, is_chair'),
+                supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, phone, year, heard_about, fall_sport_id, spring_sport_id, is_chair'),
                 supabase.from('attendance').select('*'),
                 supabase.from('selfies').select('*'),
                 supabase.from('bonus_points').select('*'),
@@ -135,6 +135,7 @@ function App() {
                 email: m.email,
                 phone: m.phone,
                 year: m.year,
+                heardAbout: m.heard_about,
                 fallSportId: m.fall_sport_id,
                 springSportId: m.spring_sport_id,
                 isChair: m.is_chair
@@ -331,6 +332,7 @@ function App() {
         };
         if (newMember.phone !== undefined) payload.phone = newMember.phone;
         if (newMember.year !== undefined) payload.year = newMember.year;
+        if (newMember.heardAbout !== undefined) payload.heard_about = newMember.heardAbout;
 
         const { error } = await supabase.from('members').upsert(payload);
         if (error) { alert('Error saving member: ' + error.message); return; }
@@ -483,7 +485,7 @@ function App() {
                 <div className="p-4 border-b border-green-900/50 flex items-center justify-between shrink-0 sticky top-0 bg-[#154734] z-10">
                     <div className="font-bold flex items-center gap-3 overflow-hidden whitespace-nowrap">
                         <div className="w-8 h-8 bg-white rounded flex items-center justify-center shrink-0 p-1"><img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" /></div>
-                        {isSidebarOpen && <span>BearPit Tracker</span>}
+                        {isSidebarOpen && <span>Bear Pit Tracker</span>}
                     </div>
                 </div>
                 <nav className="p-0 space-y-1 mt-2">
