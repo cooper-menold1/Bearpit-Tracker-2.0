@@ -5,6 +5,20 @@ import { Music, QrCode, User, UserPlus, X } from 'lucide-react';
 import LOGO_V2 from '../assets/bearpit_logo_v2.png';
 import { supabase } from '../utils/supabaseClient';
 
+const CONFETTI_EMOJI = ['🏀', '🏈', '⚾', '🏐', '🎾', '⚽'];
+
+// TODO: fill in with the real Linktree/social URL once Cooper has it.
+const SOCIAL_URL = '';
+
+interface ConfettiPiece {
+    id: number;
+    left: number;
+    emoji: string;
+    size: number;
+    duration: number;
+    delay: number;
+}
+
 interface LoginProps {
     members: Member[];
     onLogin: (member: Member, password: string) => void;
@@ -20,6 +34,22 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPortal, setShowPortal] = useState(false);
+    const [confettiPieces, setConfettiPieces] = useState<ConfettiPiece[]>([]);
+    const [confettiPlayed, setConfettiPlayed] = useState(false);
+
+    const handleLogoClick = () => {
+        if (confettiPlayed) return;
+        setConfettiPlayed(true);
+        setConfettiPieces(Array.from({ length: 60 }, (_, i) => ({
+            id: i,
+            left: Math.random() * 100,
+            emoji: CONFETTI_EMOJI[Math.floor(Math.random() * CONFETTI_EMOJI.length)],
+            size: 18 + Math.random() * 16,
+            duration: 0.9 + Math.random() * 0.6,
+            delay: Math.random() * 0.4,
+        })));
+        setTimeout(() => setConfettiPieces([]), 2000);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,7 +105,12 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-[#154734] via-[#154734]/60 to-transparent pointer-events-none" />
                 <div className="relative z-10 px-8 transform hover:scale-105 transition-transform duration-500">
-                    <img src={LOGO_V2} alt="The Bear Pit" className="w-full max-w-xl drop-shadow-2xl" />
+                    <img
+                        src={LOGO_V2}
+                        alt="The Bear Pit"
+                        onClick={handleLogoClick}
+                        className="w-full max-w-xl drop-shadow-2xl cursor-pointer"
+                    />
                 </div>
                 <button
                     onClick={() => setShowPortal(true)}
@@ -148,7 +183,18 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                             <p className="leading-relaxed mt-8 font-semibold text-[#FFB81C]">Bear Pit is a passionate community dedicated to creating an electrifying and hostile game-day environment that benefits our teams and fuels school spirit. Our organization is made up of some of the loudest and rowdiest students on campus who love Baylor sports and want to build community with fellow Baylor sports fans.</p>
                         </div>
                         <div className="pt-12">
-                            <span className="inline-block px-12 py-4 border-2 border-[#FFB81C] text-[#FFB81C] rounded-full font-bold uppercase tracking-wider hover:bg-[#FFB81C] hover:text-[#154734] transition-all duration-300 cursor-default">Sic 'Em Bears</span>
+                            {SOCIAL_URL ? (
+                                <a
+                                    href={SOCIAL_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-block px-12 py-4 border-2 border-[#FFB81C] text-[#FFB81C] rounded-full font-bold uppercase tracking-wider hover:bg-[#FFB81C] hover:text-[#154734] transition-all duration-300"
+                                >
+                                    Connect with us!
+                                </a>
+                            ) : (
+                                <span className="inline-block px-12 py-4 border-2 border-[#FFB81C] text-[#FFB81C] rounded-full font-bold uppercase tracking-wider hover:bg-[#FFB81C] hover:text-[#154734] transition-all duration-300 cursor-default">Connect with us!</span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -198,6 +244,24 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                             {error && <p className="text-red-300 text-sm text-center font-bold animate-pulse bg-red-900/20 p-2 rounded">{error}</p>}
                         </form>
                     </div>
+                </div>
+            )}
+
+            {confettiPieces.length > 0 && (
+                <div className="fixed inset-0 z-[9999] overflow-hidden pointer-events-none">
+                    {confettiPieces.map(piece => (
+                        <span
+                            key={piece.id}
+                            className="absolute top-0"
+                            style={{
+                                left: `${piece.left}%`,
+                                fontSize: `${piece.size}px`,
+                                animation: `confetti-fall ${piece.duration}s linear ${piece.delay}s forwards`,
+                            }}
+                        >
+                            {piece.emoji}
+                        </span>
+                    ))}
                 </div>
             )}
         </div>
