@@ -4,6 +4,7 @@ import { Member, Role } from '../types';
 import { CheckCircle2, ArrowLeft, UserPlus } from 'lucide-react';
 
 interface InterestFormProps {
+    members: Member[];
     onSubmit: (member: Member) => void;
     onBack: () => void;
 }
@@ -15,7 +16,7 @@ const HEARD_OPTIONS = ['A game', 'Late Night', 'A friend / word of mouth', 'Inst
 // now for existing members checking in at a game only). This is the
 // intake point for Late Night / tabling / anyone new: name + Baylor email
 // is all that's required, phone and year are optional so it stays quick.
-export const InterestForm: React.FC<InterestFormProps> = ({ onSubmit, onBack }) => {
+export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, onBack }) => {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
@@ -25,7 +26,19 @@ export const InterestForm: React.FC<InterestFormProps> = ({ onSubmit, onBack }) 
     const [submitted, setSubmitted] = useState(false);
 
     const emailValid = email.toLowerCase().endsWith('@baylor.edu');
-    const canSubmit = firstName.trim() && lastName.trim() && emailValid;
+
+    // Someone already on the roster (Member/Officer/Admin, not a still-pending
+    // Prospective) doesn't need to fill this out -- catches the case where an
+    // existing member finds this form instead of the Member Portal.
+    const existingMember = members.find(m => {
+        if (m.role === Role.PROSPECTIVE) return false;
+        const emailMatch = !!email.trim() && !!m.email && m.email.toLowerCase() === email.trim().toLowerCase();
+        const nameMatch = !!firstName.trim() && !!lastName.trim() &&
+            `${m.firstName} ${m.lastName}`.toLowerCase() === `${firstName.trim()} ${lastName.trim()}`.toLowerCase();
+        return emailMatch || nameMatch;
+    });
+
+    const canSubmit = firstName.trim() && lastName.trim() && emailValid && !existingMember;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -167,6 +180,13 @@ export const InterestForm: React.FC<InterestFormProps> = ({ onSubmit, onBack }) 
                             {HEARD_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
                         </select>
                     </div>
+
+                    {existingMember && (
+                        <div className="bg-amber-50 p-3 rounded-lg text-sm text-amber-800 border border-amber-100">
+                            Looks like you're already a Bear Pit member! No need to fill this out -- use the{' '}
+                            <strong>Member Portal</strong> (top right of the login page) to sign in instead.
+                        </div>
+                    )}
 
                     <button
                         type="submit"

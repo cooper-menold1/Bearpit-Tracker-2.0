@@ -476,7 +476,7 @@ function App() {
     if (mode === 'chants') return <ChantGallery onBack={() => setMode('login')} />;
     if (mode === 'login') return <Login members={data.members} onLogin={handleLogin} onGuest={handleGuestForm} onChants={() => setMode('chants')} onInterest={() => setMode('interest')} selfies={data.selfies} />;
     if (mode === 'form') return <AttendanceForm members={data.members} games={data.games} sports={data.sports} onSubmit={handleFormSubmit} onBack={handleLogout} />;
-    if (mode === 'interest') return <InterestForm onSubmit={handleAddMember} onBack={handleLogout} />;
+    if (mode === 'interest') return <InterestForm members={data.members} onSubmit={handleAddMember} onBack={handleLogout} />;
     if (mode === 'member' && currentMember) return <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} />;
 
     return (
