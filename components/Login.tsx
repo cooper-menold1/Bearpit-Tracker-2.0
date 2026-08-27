@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Member, Selfie, Role } from '../types';
 import { Music, QrCode, User, UserPlus, X } from 'lucide-react';
-import LOGO_V2 from '../assets/bearpit_logo_v2.png';
+import LOGO_V2 from '../assets/bearpit_logo_full_color.png';
 import { supabase } from '../utils/supabaseClient';
 
 const CONFETTI_EMOJI = ['🏀', '🏈', '⚾', '🏐', '🎾', '⚽'];
