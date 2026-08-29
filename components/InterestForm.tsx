@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { Member, Role } from '../types';
-import { CheckCircle2, ArrowLeft, UserPlus } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, UserPlus, AlertTriangle } from 'lucide-react';
+import { supabase } from '../utils/supabaseClient';
 
 interface InterestFormProps {
     members: Member[];
@@ -24,6 +25,8 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
     const [year, setYear] = useState('');
     const [heardAbout, setHeardAbout] = useState('');
     const [submitted, setSubmitted] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState('');
 
     const emailValid = email.toLowerCase().endsWith('@baylor.edu');
 
@@ -40,12 +43,15 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
 
     const canSubmit = firstName.trim() && lastName.trim() && emailValid && !existingMember;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!canSubmit) return;
+        if (!canSubmit || submitting) return;
 
-        onSubmit({
-            id: `prospect_${Date.now()}`,
+        setSubmitting(true);
+        setSubmitError('');
+
+        const member: Member = {
+            id: `prospect_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             firstName: firstName.trim(),
             lastName: lastName.trim(),
             email: email.trim(),
@@ -54,8 +60,39 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
             heardAbout: heardAbout || undefined,
             role: Role.PROSPECTIVE,
             yearsInBPLT: 0,
-        });
-        setSubmitted(true);
+        };
+
+        try {
+            // Written directly here (rather than only via the onSubmit prop)
+            // and awaited, so a real write failure is caught and shown to the
+            // person submitting instead of silently swallowed -- this is the
+            // public "I'm interested" form, unattended, often on someone's
+            // phone on weak signal at a table/game, so a lost signup with no
+            // error shown is the failure mode that actually matters here.
+            const { error } = await supabase.from('members').insert({
+                id: member.id,
+                first_name: member.firstName,
+                last_name: member.lastName,
+                role: member.role,
+                years_in_bplt: member.yearsInBPLT,
+                email: member.email,
+                phone: member.phone,
+                year: member.year,
+                heard_about: member.heardAbout,
+            });
+            if (error) throw error;
+
+            setSubmitted(true);
+            // Best-effort refresh of the parent's cached member list -- the
+            // real save already succeeded above, so a failure here (e.g. the
+            // redundant upsert inside handleAddMember) isn't user-facing.
+            try { onSubmit(member); } catch { /* non-fatal, see above */ }
+        } catch (err) {
+            console.error('Interest form submit failed:', err);
+            setSubmitError("Something went wrong submitting your info. Please try again -- if it keeps happening, find a BearPit officer and let them know.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     if (submitted) {
@@ -188,12 +225,19 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                         </div>
                     )}
 
+                    {submitError && (
+                        <div className="bg-red-50 p-3 rounded-lg text-sm text-red-800 border border-red-100 flex gap-2 items-start">
+                            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>{submitError}</span>
+                        </div>
+                    )}
+
                     <button
                         type="submit"
-                        disabled={!canSubmit}
+                        disabled={!canSubmit || submitting}
                         className="w-full bg-[#154734] text-white py-3 rounded-lg font-bold hover:bg-[#0f3325] disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
                     >
-                        Submit
+                        {submitting ? 'Submitting...' : 'Submit'}
                     </button>
                 </form>
             </div>
