@@ -1,15 +1,23 @@
 
-import React, { useState, useRef } from 'react';
-import { Member, Game, Selfie, Sport } from '../types';
-import { CheckCircle2, User, Calendar, Trophy, Camera, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Member, Game, Sport } from '../types';
+import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { VENUES } from '../constants';
 import { getDistance, getCurrentPosition } from '../utils/location';
+
+export interface AttendanceLocation {
+    latitude: number;
+    longitude: number;
+    accuracyMeters: number;
+    distanceMeters: number | null; // null when there's no venue to compare against
+    withinGeofence: boolean | null; // null when there's no venue to compare against
+}
 
 interface AttendanceFormProps {
     members: Member[];
     games: Game[];
     sports: Sport[];
-    onSubmit: (gameId: string, memberId: string, newMemberDetails?: Member, selfie?: Selfie) => void;
+    onSubmit: (gameId: string, memberId: string, location: AttendanceLocation | null, newMemberDetails?: Member) => void;
     onBack: () => void;
 }
 
@@ -26,14 +34,11 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
     const hasVenues = (selectedSport?.venueIds?.length || 0) > 0 && !isAwayGame;
 
     const [submitted, setSubmitted] = useState(false);
-    const [selfiesData, setSelfiesData] = useState<string[]>([]); // Array of base64 strings
 
-    // Location Verification States
+    // Location Sharing States
     const [isVerifyingLocation, setIsVerifyingLocation] = useState(false);
     const [locationError, setLocationError] = useState<string | null>(null);
-    const [isLocationVerified, setIsLocationVerified] = useState(false);
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [location, setLocation] = useState<AttendanceLocation | null>(null);
 
     // Date filtering: Only show games for TODAY
     const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
@@ -41,52 +46,45 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
         .filter(g => g.date === todayStr)
         .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
 
-    const verifyLocation = async (gameId: string) => {
+    const shareLocation = async (gameId: string) => {
         if (!gameId) {
-            setIsLocationVerified(false);
+            setLocation(null);
             return;
         }
 
         setIsVerifyingLocation(true);
         setLocationError(null);
-        setIsLocationVerified(false);
+        setLocation(null);
 
         try {
             const game = games.find(g => g.id === gameId);
             if (!game) throw new Error("Game not found");
 
             const sport = sports.find(s => s.id === game.sportId);
-            if (!sport || !sport.venueIds || sport.venueIds.length === 0) {
-                return;
-            }
+            const validVenues = (game.location !== 'Away' && sport?.venueIds)
+                ? VENUES.filter(v => sport.venueIds?.includes(v.id))
+                : [];
 
             const position = await getCurrentPosition();
-            const { latitude, longitude } = position.coords;
+            const { latitude, longitude, accuracy } = position.coords;
 
-            const validVenues = VENUES.filter(v => sport.venueIds?.includes(v.id));
-            let isNearAnyVenue = false;
+            let distanceMeters: number | null = null;
+            let withinGeofence: boolean | null = null;
 
-            for (const venue of validVenues) {
-                const distance = getDistance(latitude, longitude, venue.latitude, venue.longitude);
-                if (distance <= venue.radiusMeters) {
-                    isNearAnyVenue = true;
-                    break;
-                }
+            if (validVenues.length > 0) {
+                distanceMeters = Math.min(...validVenues.map(v => getDistance(latitude, longitude, v.latitude, v.longitude)));
+                withinGeofence = validVenues.some(v => getDistance(latitude, longitude, v.latitude, v.longitude) <= v.radiusMeters);
             }
 
-            if (isNearAnyVenue) {
-                setIsLocationVerified(true);
-            } else {
-                setLocationError("You must be at the venue to log attendance.");
-            }
+            setLocation({ latitude, longitude, accuracyMeters: accuracy, distanceMeters, withinGeofence });
         } catch (err: any) {
-            console.error("Location verification failed", err);
+            console.error("Location sharing failed", err);
             if (err.code === 1) {
-                setLocationError("Location access is required to log attendance.");
+                setLocationError("Location access is required to log attendance. Please allow location sharing and try again.");
             } else if (err.code === 3) {
                 setLocationError("Location request timed out. Please try again.");
             } else {
-                setLocationError(err.message || "Could not verify your location.");
+                setLocationError(err.message || "Could not get your location.");
             }
         } finally {
             setIsVerifyingLocation(false);
@@ -96,15 +94,9 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
     const handleGameChange = (gameId: string) => {
         setSelectedGameId(gameId);
         if (gameId) {
-            const game = games.find(g => g.id === gameId);
-            if (game?.location === 'Away') {
-                setIsLocationVerified(false);
-                setLocationError(null);
-            } else {
-                verifyLocation(gameId);
-            }
+            shareLocation(gameId);
         } else {
-            setIsLocationVerified(false);
+            setLocation(null);
             setLocationError(null);
         }
     };
@@ -126,53 +118,11 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
         }
     };
 
-    const handleSelfieCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            Array.from(files).forEach((file: File) => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        const MAX_WIDTH = 800;
-                        const scaleSize = MAX_WIDTH / img.width;
-                        canvas.width = MAX_WIDTH;
-                        canvas.height = img.height * scaleSize;
-
-                        if (ctx) {
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            const compressedData = canvas.toDataURL('image/jpeg', 0.8);
-                            setSelfiesData(prev => [...prev, compressedData]);
-                        }
-                    };
-                    if (event.target?.result) img.src = event.target.result as string;
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-    };
-
-    const removeSelfie = (index: number) => {
-        setSelfiesData(prev => prev.filter((_, i) => i !== index));
-    };
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedGameId || !matchedMember) return;
 
-        const finalMemberId = matchedMember.id;
-
-        const selfieObjects: Selfie[] = selfiesData.map((data, idx) => ({
-            id: `selfie_${Date.now()}_${idx}`,
-            memberId: finalMemberId,
-            gameId: selectedGameId,
-            imageData: data,
-            timestamp: new Date().toISOString()
-        }));
-
-        onSubmit(selectedGameId, finalMemberId, undefined, selfieObjects as any);
+        onSubmit(selectedGameId, matchedMember.id, location);
         setSubmitted(true);
     };
 
@@ -294,99 +244,61 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                             </div>
 
                             {/* Verification Hint */}
-                            <div className={`${(hasVenues && !isAwayGame) ? 'bg-yellow-50 border-yellow-100' : 'bg-blue-50 border-blue-100'} p-3 rounded-lg border flex items-start gap-2 mb-2`}>
-                                <div className="text-[#154734] mt-0.5"><Trophy className="w-4 h-4" /></div>
+                            <div className="bg-blue-50 border-blue-100 p-3 rounded-lg border flex items-start gap-2 mb-2">
+                                <div className="text-[#154734] mt-0.5"><MapPin className="w-4 h-4" /></div>
                                 <div className="text-xs text-gray-700 leading-relaxed">
-                                    {isAwayGame ? (
-                                        <><strong>Away Game:</strong> Location verification is skipped. You <strong>must upload a photo</strong> of the game (or yourself watching it) to log attendance.</>
-                                    ) : hasVenues ? (
-                                        <><strong>Verification Required:</strong> To log attendance, you must either <strong>be at the venue</strong> (verified via location) OR <strong>upload a photo</strong>.</>
-                                    ) : (
-                                        <><strong>Photo Required:</strong> No venue is defined for this sport. You must <strong>upload a photo</strong> to log attendance.</>
-                                    )}
+                                    <strong>Location Required:</strong> To log attendance you must share your location.
+                                    It's recorded with your check-in so officers can double-check it{hasVenues ? " against the venue" : ""}.
                                 </div>
                             </div>
 
-                            {/* Location Verification Status */}
-                            {selectedGameId && hasVenues && !isAwayGame && (
+                            {/* Location Sharing Status */}
+                            {selectedGameId && (
                                 <div className="animate-in fade-in duration-300">
                                     {isVerifyingLocation ? (
                                         <div className="flex items-center gap-2 text-sm text-[#154734] bg-green-50 p-3 rounded-lg border border-green-100">
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Checking your location...
+                                            Getting your location...
                                         </div>
                                     ) : locationError ? (
                                         <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
                                             <AlertTriangle className="w-4 h-4 shrink-0" />
                                             <div className="flex-1">
                                                 <span>{locationError}</span>
-                                                <p className="text-[10px] opacity-80 mt-0.5">If you can't verify location, please upload a photo below instead.</p>
+                                                <p className="text-[10px] opacity-80 mt-0.5">You can still submit -- it'll be flagged for an officer to double-check.</p>
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => verifyLocation(selectedGameId)}
+                                                onClick={() => shareLocation(selectedGameId)}
                                                 className="ml-auto text-xs font-bold underline whitespace-nowrap"
                                             >
                                                 Retry
                                             </button>
                                         </div>
-                                    ) : isLocationVerified ? (
-                                        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-100">
-                                            <CheckCircle2 className="w-4 h-4" />
-                                            Location verified! Sic 'Em!
-                                        </div>
+                                    ) : location ? (
+                                        location.withinGeofence === true ? (
+                                            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-100">
+                                                <CheckCircle2 className="w-4 h-4" />
+                                                Location shared -- you're at the venue. Sic 'Em!
+                                            </div>
+                                        ) : location.withinGeofence === false ? (
+                                            <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                                                <MapPin className="w-4 h-4 shrink-0" />
+                                                <span>Location shared, but you look ~{Math.round(location.distanceMeters!)}m from the venue. This will be flagged for an officer to double-check.</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-100">
+                                                <CheckCircle2 className="w-4 h-4" />
+                                                Location shared with your check-in.
+                                            </div>
+                                        )
                                     ) : null}
                                 </div>
                             )}
 
-                            {/* Selfie Section */}
-                            <div className="pt-4 border-t border-gray-100">
-                                <label className="block text-sm font-bold text-gray-700 mb-2 flex justify-between">
-                                    <span>Upload Photos {(hasVenues && !isAwayGame) ? '(Required if no location)' : '(Strictly Required)'}</span>
-                                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded">Multi-select allowed</span>
-                                </label>
-
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    className="hidden"
-                                    ref={fileInputRef}
-                                    onChange={handleSelfieCapture}
-                                />
-
-                                <div className="grid grid-cols-2 gap-2 mb-2">
-                                    {selfiesData.map((data, idx) => (
-                                        <div key={idx} className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50 shadow-sm aspect-square">
-                                            <img src={data} alt={`Selfie ${idx}`} className="w-full h-full object-cover" />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeSelfie(idx)}
-                                                className="absolute top-1 right-1 bg-white text-red-500 p-1 rounded-full shadow hover:bg-red-50"
-                                            >
-                                                <AlertTriangle className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-500 hover:border-[#FFB81C] hover:bg-yellow-50 transition-colors flex flex-col items-center justify-center gap-2 aspect-square"
-                                    >
-                                        <Camera className="w-6 h-6 text-gray-400" />
-                                        <span className="text-xs font-medium">Add Photo</span>
-                                    </button>
-                                </div>
-                            </div>
-
                             <button
                                 onClick={handleSubmit}
-                                disabled={
-                                    !selectedGameId ||
-                                    (isAwayGame ? selfiesData.length === 0 : (!isLocationVerified && selfiesData.length === 0)) ||
-                                    isVerifyingLocation
-                                }
+                                disabled={!selectedGameId || isVerifyingLocation}
                                 className="w-full bg-[#154734] text-white py-3 rounded-lg font-bold hover:bg-[#0f3325] disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-colors mt-4 flex items-center justify-center gap-2"
                             >
                                 <CheckCircle2 className="w-5 h-5" />

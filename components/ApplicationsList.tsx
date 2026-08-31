@@ -176,6 +176,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             <th className="px-6 py-3">Phone</th>
                             <th className="px-6 py-3">Year</th>
                             <th className="px-6 py-3">Heard About</th>
+                            <th className="px-6 py-3">Referred By</th>
                             <th className="px-6 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -189,6 +190,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                                     <td className="px-6 py-4 text-gray-500">{m.phone || '—'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.year || '—'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.heardAbout || '—'}</td>
+                                    <td className="px-6 py-4 text-gray-500">{m.referredBy || '—'}</td>
                                     <td className="px-6 py-4 text-right whitespace-nowrap">
                                         {mailtoHref ? (
                                             <a

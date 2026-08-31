@@ -1,24 +1,32 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { INITIAL_STATE, LOGO_URL } from './constants';
 import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate } from './types';
-import { SportSheet } from './components/SportSheet';
-import { Dashboard } from './components/Dashboard';
-import { Management } from './components/Management';
 import { Login } from './components/Login';
-import { AttendanceForm } from './components/AttendanceForm';
+import { AttendanceForm, AttendanceLocation } from './components/AttendanceForm';
 import { InterestForm } from './components/InterestForm';
-import { MemberPortal } from './components/MemberPortal';
 import { Instructions } from './components/Instructions';
 import { QRCodeDisplay } from './components/QRCodeDisplay';
-import { SelfieGallery } from './components/SelfieGallery';
-import { SportsManager } from './components/SportsManager';
-import { Leaderboard } from './components/Leaderboard';
 import { SettingsModal } from './components/SettingsModal';
 import { ChantGallery } from './components/ChantGallery';
-import { ChantManager } from './components/ChantManager';
-import { ApplicationsList } from './components/ApplicationsList';
 import { supabase } from './utils/supabaseClient';
+
+// Lazily loaded: admin-only screens and on-demand modals. Splitting these out
+// (Dashboard alone pulls in recharts) keeps the initial bundle small for the
+// much more common public paths -- login, the guest attendance form, the
+// interest form, and the member portal -- which never need this code.
+const SportSheet = lazy(() => import('./components/SportSheet').then(m => ({ default: m.SportSheet })));
+const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const Management = lazy(() => import('./components/Management').then(m => ({ default: m.Management })));
+const SelfieGallery = lazy(() => import('./components/SelfieGallery').then(m => ({ default: m.SelfieGallery })));
+const SportsManager = lazy(() => import('./components/SportsManager').then(m => ({ default: m.SportsManager })));
+const Leaderboard = lazy(() => import('./components/Leaderboard').then(m => ({ default: m.Leaderboard })));
+const ChantManager = lazy(() => import('./components/ChantManager').then(m => ({ default: m.ChantManager })));
+const ApplicationsList = lazy(() => import('./components/ApplicationsList').then(m => ({ default: m.ApplicationsList })));
+// MemberPortal statically imports Management + Leaderboard for its embedded
+// admin views, so lazy-loading it here is what actually keeps those two out
+// of the main bundle for the public-facing paths above.
+const MemberPortal = lazy(() => import('./components/MemberPortal').then(m => ({ default: m.MemberPortal })));
 import {
     LayoutDashboard,
     Users,
@@ -76,6 +84,11 @@ function App() {
         return (savedMode as any) || 'login';
     });
 
+    const prospectiveCount = useMemo(
+        () => data.members.filter(m => m.role === Role.PROSPECTIVE).length,
+        [data.members]
+    );
+
     useEffect(() => {
         if (currentMember) {
             sessionStorage.setItem('bp_member', JSON.stringify(currentMember));
@@ -94,107 +107,116 @@ function App() {
         setShowChantManager(false);
     }, [currentMember, mode]);
 
+    // Split from selfies on purpose: selfies.image_data holds full base64 photo
+    // blobs, so re-running that query on every unrelated realtime event (e.g. one
+    // attendance toggle) would re-download every photo for every connected
+    // client. fetchCoreData() covers everything else and is cheap to re-run.
+    const fetchCoreData = async () => {
+        const [
+            { data: sports },
+            { data: games },
+            { data: members },
+            { data: attendance },
+            { data: bonusPoints },
+            { data: selfieVotes },
+            { data: emailTemplateRow }
+        ] = await Promise.all([
+            supabase.from('sports').select('*'),
+            supabase.from('games').select('*'),
+            // SECURITY FLAGGED: Do not select password column for all users
+            supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, phone, year, heard_about, referred_by, fall_sport_id, spring_sport_id, is_chair'),
+            supabase.from('attendance').select('*'),
+            supabase.from('bonus_points').select('*'),
+            supabase.from('selfie_votes').select('*'),
+            // Falls back to null if the migration hasn't been run yet -- not fatal.
+            supabase.from('email_templates').select('*').eq('id', 'prospective_welcome').maybeSingle()
+        ]);
+
+        const attendanceMap: Record<string, Record<string, boolean>> = {};
+        attendance?.forEach((record: any) => {
+            if (!attendanceMap[record.game_id]) attendanceMap[record.game_id] = {};
+            attendanceMap[record.game_id][record.member_id] = true;
+        });
+
+        const mappedMembers: Member[] = (members || []).map((m: any) => ({
+            id: m.id,
+            firstName: m.first_name,
+            lastName: m.last_name,
+            role: (m.role.charAt(0).toUpperCase() + m.role.slice(1).toLowerCase()) as Role,
+            yearsInBPLT: m.years_in_bplt,
+            password: m.password, // This will be undefined now, which is safer
+            email: m.email,
+            phone: m.phone,
+            year: m.year,
+            heardAbout: m.heard_about,
+            referredBy: m.referred_by,
+            fallSportId: m.fall_sport_id,
+            springSportId: m.spring_sport_id,
+            isChair: m.is_chair
+        }));
+
+        const mappedGames: Game[] = (games || []).map((g: any) => ({
+            id: g.id,
+            sportId: g.sport_id,
+            date: g.date,
+            time: g.time,
+            opponent: g.opponent,
+            location: g.location,
+            isBonus: g.is_bonus,
+            pointsValue: g.points_value || 1,
+            description: g.description
+        }));
+
+        const mappedSports: Sport[] = (sports || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            attendanceThreshold: s.attendance_threshold || 0.5,
+            venueIds: s.venue_ids || []
+        }));
+
+        const mappedEmailTemplate: EmailTemplate | null = emailTemplateRow ? {
+            id: emailTemplateRow.id,
+            subject: emailTemplateRow.subject,
+            body: emailTemplateRow.body,
+            meetingType: emailTemplateRow.meeting_type,
+            meetingDate: emailTemplateRow.meeting_date,
+            meetingTime: emailTemplateRow.meeting_time,
+            meetingLocation: emailTemplateRow.meeting_location
+        } : null;
+
+        setData(prev => ({
+            ...prev,
+            members: mappedMembers,
+            games: mappedGames,
+            attendance: attendanceMap,
+            sports: mappedSports,
+            selfieVotes: (selfieVotes || []).map((v: any) => ({ selfieId: v.selfie_id, memberId: v.member_id })),
+            bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date })),
+            emailTemplate: mappedEmailTemplate
+        }));
+    };
+
+    const fetchSelfies = async () => {
+        const { data: selfies } = await supabase.from('selfies').select('*');
+        const mappedSelfies: Selfie[] = (selfies || []).map((s: any) => ({
+            id: s.id,
+            memberId: s.member_id,
+            gameId: s.game_id,
+            imageData: s.image_data,
+            timestamp: s.timestamp
+        }));
+        setData(prev => ({ ...prev, selfies: mappedSelfies }));
+    };
+
     const fetchData = async () => {
         setSyncStatus('syncing');
         try {
-            const [
-                { data: sports },
-                { data: games },
-                { data: members },
-                { data: attendance },
-                { data: selfies },
-                { data: bonusPoints },
-                { data: selfieVotes },
-                { data: emailTemplateRow }
-            ] = await Promise.all([
-                supabase.from('sports').select('*'),
-                supabase.from('games').select('*'),
-                // SECURITY FLAGGED: Do not select password column for all users
-                supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, phone, year, heard_about, fall_sport_id, spring_sport_id, is_chair'),
-                supabase.from('attendance').select('*'),
-                supabase.from('selfies').select('*'),
-                supabase.from('bonus_points').select('*'),
-                supabase.from('selfie_votes').select('*'),
-                // Falls back to null if the migration hasn't been run yet -- not fatal.
-                supabase.from('email_templates').select('*').eq('id', 'prospective_welcome').maybeSingle()
-            ]);
-
-            const attendanceMap: Record<string, Record<string, boolean>> = {};
-            attendance?.forEach((record: any) => {
-                if (!attendanceMap[record.game_id]) attendanceMap[record.game_id] = {};
-                attendanceMap[record.game_id][record.member_id] = true;
-            });
-
-            const mappedMembers: Member[] = (members || []).map((m: any) => ({
-                id: m.id,
-                firstName: m.first_name,
-                lastName: m.last_name,
-                role: (m.role.charAt(0).toUpperCase() + m.role.slice(1).toLowerCase()) as Role,
-                yearsInBPLT: m.years_in_bplt,
-                password: m.password, // This will be undefined now, which is safer
-                email: m.email,
-                phone: m.phone,
-                year: m.year,
-                heardAbout: m.heard_about,
-                fallSportId: m.fall_sport_id,
-                springSportId: m.spring_sport_id,
-                isChair: m.is_chair
-            }));
-
-            const mappedGames: Game[] = (games || []).map((g: any) => ({
-                id: g.id,
-                sportId: g.sport_id,
-                date: g.date,
-                time: g.time,
-                opponent: g.opponent,
-                location: g.location,
-                isBonus: g.is_bonus,
-                pointsValue: g.points_value || 1,
-                description: g.description
-            }));
-
-            const mappedSelfies: Selfie[] = (selfies || []).map((s: any) => ({
-                id: s.id,
-                memberId: s.member_id,
-                gameId: s.game_id,
-                imageData: s.image_data,
-                timestamp: s.timestamp
-            }));
-
-            const mappedSports: Sport[] = (sports || []).map((s: any) => ({
-                id: s.id,
-                name: s.name,
-                attendanceThreshold: s.attendance_threshold || 0.5,
-                venueIds: s.venue_ids || []
-            }));
-
-            const mappedEmailTemplate: EmailTemplate | null = emailTemplateRow ? {
-                id: emailTemplateRow.id,
-                subject: emailTemplateRow.subject,
-                body: emailTemplateRow.body,
-                meetingType: emailTemplateRow.meeting_type,
-                meetingDate: emailTemplateRow.meeting_date,
-                meetingTime: emailTemplateRow.meeting_time,
-                meetingLocation: emailTemplateRow.meeting_location
-            } : null;
-
-            setData(prev => ({
-                ...prev,
-                members: mappedMembers,
-                games: mappedGames,
-                attendance: attendanceMap,
-                sports: mappedSports,
-                selfies: mappedSelfies,
-                selfieVotes: (selfieVotes || []).map((v: any) => ({ selfieId: v.selfie_id, memberId: v.member_id })),
-                bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date })),
-                emailTemplate: mappedEmailTemplate
-            }));
-
+            await Promise.all([fetchCoreData(), fetchSelfies()]);
             setSyncStatus('success');
-            setIsLoading(false);
         } catch (error) {
             console.error("Error fetching data:", error);
             setSyncStatus('error');
+        } finally {
             setIsLoading(false);
         }
     };
@@ -203,12 +225,12 @@ function App() {
         fetchData();
         const channels = supabase
             .channel('custom-all-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => fetchData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => fetchData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'sports' }, () => fetchData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'selfies' }, () => fetchData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'email_templates' }, () => fetchData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'sports' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'selfies' }, () => fetchSelfies())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'email_templates' }, () => fetchCoreData())
             .subscribe();
         return () => { supabase.removeChannel(channels); };
     }, []);
@@ -286,7 +308,7 @@ function App() {
                 setCurrentMember(refreshed);
             }
 
-            fetchData();
+            fetchCoreData();
         } catch (e: any) { alert("Error updating profile: " + e.message); }
     };
 
@@ -305,7 +327,7 @@ function App() {
             } else {
                 await supabase.from('attendance').insert({ game_id: gameId, member_id: memberId });
             }
-        } catch (e: any) { fetchData(); }
+        } catch (e: any) { fetchCoreData(); }
     };
 
     const handleAddMember = async (newMember: Member) => {
@@ -333,6 +355,7 @@ function App() {
         if (newMember.phone !== undefined) payload.phone = newMember.phone;
         if (newMember.year !== undefined) payload.year = newMember.year;
         if (newMember.heardAbout !== undefined) payload.heard_about = newMember.heardAbout;
+        if (newMember.referredBy !== undefined) payload.referred_by = newMember.referredBy;
 
         const { error } = await supabase.from('members').upsert(payload);
         if (error) { alert('Error saving member: ' + error.message); return; }
@@ -348,7 +371,7 @@ function App() {
             }
         }
 
-        fetchData();
+        fetchCoreData();
     };
 
     const handleDeleteMember = async (id: string) => {
@@ -366,7 +389,7 @@ function App() {
             meeting_location: template.meetingLocation
         });
         if (error) { alert('Error saving template: ' + error.message); return; }
-        fetchData();
+        fetchCoreData();
     };
 
     const handleAddGame = async (game: Game) => {
@@ -381,7 +404,7 @@ function App() {
             points_value: game.pointsValue,
             description: game.description
         });
-        await fetchData();
+        await fetchCoreData();
     };
 
     const handleDeleteGame = async (id: string) => {
@@ -391,7 +414,7 @@ function App() {
     const handleAddSport = async (name: string, venueIds: string[] = []): Promise<string> => {
         const id = 'sport_' + Date.now();
         await supabase.from('sports').insert({ id, name, venue_ids: venueIds });
-        await fetchData();
+        await fetchCoreData();
         return id;
     };
 
@@ -399,11 +422,19 @@ function App() {
         if (window.confirm("Delete sport?")) await supabase.from('sports').delete().eq('id', id);
     };
 
-    const handleFormSubmit = async (gameId: string, memberId: string, newMember?: Member, selfie?: Selfie) => {
+    const handleFormSubmit = async (gameId: string, memberId: string, location: AttendanceLocation | null, newMember?: Member) => {
         if (newMember) await handleAddMember(newMember);
         if (newMember?.role === Role.PROSPECTIVE) return;
-        await supabase.from('attendance').insert({ game_id: gameId, member_id: memberId });
-        await fetchData();
+        await supabase.from('attendance').insert({
+            game_id: gameId,
+            member_id: memberId,
+            latitude: location?.latitude ?? null,
+            longitude: location?.longitude ?? null,
+            accuracy_meters: location?.accuracyMeters ?? null,
+            distance_meters: location?.distanceMeters ?? null,
+            within_geofence: location?.withinGeofence ?? null,
+        });
+        await fetchCoreData();
     };
 
     const handleToggleSelfieVote = async (selfieId: string, memberId: string) => {
@@ -412,7 +443,7 @@ function App() {
         const voted = data.selfieVotes.some(v => v.memberId === memberId && v.selfieId === selfieId);
         if (voted) await supabase.from('selfie_votes').delete().match({ selfie_id: selfieId, member_id: memberId });
         else await supabase.from('selfie_votes').insert({ selfie_id: selfieId, member_id: memberId });
-        fetchData();
+        fetchCoreData();
     };
 
     const renderContent = () => {
@@ -443,11 +474,11 @@ function App() {
                 onUpdateProfile={handleUpdateProfile}
                 onAddBonusPoint={async (mid, pts, reason) => {
                     await supabase.from('bonus_points').insert({ member_id: mid, points: pts, reason, date: new Date().toISOString() });
-                    fetchData();
+                    fetchCoreData();
                 }}
                 onDeleteBonusPoint={async (id) => {
                     await supabase.from('bonus_points').delete().eq('id', id);
-                    fetchData();
+                    fetchCoreData();
                 }}
                 onAddSport={handleAddSport}
                 userRole={currentMember?.role}
@@ -465,7 +496,7 @@ function App() {
                 onToggleAttendance={handleToggleAttendance}
                 onUpdateThreshold={async (id, val) => {
                     await supabase.from('sports').update({ attendance_threshold: val }).eq('id', id);
-                    fetchData();
+                    fetchCoreData();
                 }}
             />
         );
@@ -477,7 +508,11 @@ function App() {
     if (mode === 'login') return <Login members={data.members} onLogin={handleLogin} onGuest={handleGuestForm} onChants={() => setMode('chants')} onInterest={() => setMode('interest')} selfies={data.selfies} />;
     if (mode === 'form') return <AttendanceForm members={data.members} games={data.games} sports={data.sports} onSubmit={handleFormSubmit} onBack={handleLogout} />;
     if (mode === 'interest') return <InterestForm members={data.members} onSubmit={handleAddMember} onBack={handleLogout} />;
-    if (mode === 'member' && currentMember) return <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} />;
+    if (mode === 'member' && currentMember) return (
+        <Suspense fallback={<div className="h-screen bg-[#154734] flex items-center justify-center text-white"><RefreshCw className="w-10 h-10 animate-spin" /></div>}>
+            <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} />
+        </Suspense>
+    );
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -494,9 +529,9 @@ function App() {
                     <button onClick={() => setCurrentView('applications')} className={`w-full flex items-center gap-3 px-4 py-3 ${currentView === 'applications' ? 'bg-[#FFB81C] text-[#154734] font-bold' : 'text-gray-300'}`}>
                         <Mail className="w-5 h-5" />
                         {isSidebarOpen && <span>Applications</span>}
-                        {data.members.filter(m => m.role === Role.PROSPECTIVE).length > 0 && (
+                        {prospectiveCount > 0 && (
                             <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${currentView === 'applications' ? 'bg-[#154734] text-white' : 'bg-[#FFB81C] text-[#154734]'} ${isSidebarOpen ? 'ml-auto' : ''}`}>
-                                {data.members.filter(m => m.role === Role.PROSPECTIVE).length}
+                                {prospectiveCount}
                             </span>
                         )}
                     </button>
@@ -513,14 +548,20 @@ function App() {
                     <button onClick={handleLogout} className="w-full flex items-center gap-3 px-2 py-2 text-red-300 hover:text-red-400 mt-2 text-left"><LogOut className="w-5 h-5" />{isSidebarOpen && <span>Sign Out</span>}</button>
                 </div>
             </aside>
-            <main className="flex-1 overflow-auto p-4 relative">{renderContent()}</main>
+            <main className="flex-1 overflow-auto p-4 relative">
+                <Suspense fallback={<div className="flex items-center justify-center h-full"><RefreshCw className="w-8 h-8 animate-spin text-green-700" /></div>}>
+                    {renderContent()}
+                </Suspense>
+            </main>
             <QRCodeDisplay isOpen={showQRCode} onClose={() => setShowQRCode(false)} publicUrl={data.settings.publicUrl} />
             <Instructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} sheetUrl="" adminPassword={data.settings.adminPassword} onSaveUrl={() => { }} onSaveSettings={() => { }} />
-            {currentMember && (
-                <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} currentMember={currentMember} selfieVotes={data.selfieVotes} />
-            )}
-            <SportsManager isOpen={showSportsManager} onClose={() => setShowSportsManager(false)} sports={data.sports} games={data.games} onAddSport={handleAddSport} onDeleteSport={handleDeleteSport} onUpdateSportVenues={async (id, vids) => await supabase.from('sports').update({ venue_ids: vids }).eq('id', id)} />
-            <ChantManager isOpen={showChantManager} onClose={() => setShowChantManager(false)} />
+            <Suspense fallback={null}>
+                {currentMember && (
+                    <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} currentMember={currentMember} selfieVotes={data.selfieVotes} />
+                )}
+                <SportsManager isOpen={showSportsManager} onClose={() => setShowSportsManager(false)} sports={data.sports} games={data.games} onAddSport={handleAddSport} onDeleteSport={handleDeleteSport} onUpdateSportVenues={async (id, vids) => await supabase.from('sports').update({ venue_ids: vids }).eq('id', id)} />
+                <ChantManager isOpen={showChantManager} onClose={() => setShowChantManager(false)} />
+            </Suspense>
             {currentMember && (
                 <SettingsModal
                     isOpen={showSettingsModal}

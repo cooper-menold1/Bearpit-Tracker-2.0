@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AppState } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Users, CalendarDays, Trophy, Medal, Home, Download } from 'lucide-react';
@@ -10,10 +10,10 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
   // Calculate total attendance for leaderboard (HOME GAMES ONLY)
-  const leaderBoard = data.members.map(member => {
+  const leaderBoard = useMemo(() => data.members.map(member => {
     let totalAttended = 0;
     let totalBonus = 0;
-    
+
     // Iterate through games, filter only Home
     data.games.filter(g => g.location === 'Home').forEach(game => {
         const attendees = data.attendance[game.id];
@@ -29,10 +29,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
       bonus: totalBonus,
       role: member.role
     };
-  }).sort((a, b) => b.attended - a.attended).slice(0, 10);
+  }).sort((a, b) => b.attended - a.attended).slice(0, 10), [data.members, data.games, data.attendance]);
 
   // Chart Data: Average Attendance per Sport (HOME GAMES ONLY)
-  const sportStats = data.sports.map(sport => {
+  const sportStats = useMemo(() => data.sports.map(sport => {
     const sportHomeGames = data.games.filter(g => g.sportId === sport.id && g.location === 'Home');
     if (sportHomeGames.length === 0) return { name: sport.name, avg: 0 };
 
@@ -46,10 +46,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
 
     const avg = Math.round(totalPresence / sportHomeGames.length);
     return { name: sport.name, avg };
-  });
+  }), [data.sports, data.games, data.attendance]);
 
   // Count only home games for display
-  const homeGamesCount = data.games.filter(g => g.location === 'Home').length;
+  const homeGamesCount = useMemo(() => data.games.filter(g => g.location === 'Home').length, [data.games]);
 
   const handleExportCSV = () => {
     // Create a comprehensive CSV

@@ -24,6 +24,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
     const [phone, setPhone] = useState('');
     const [year, setYear] = useState('');
     const [heardAbout, setHeardAbout] = useState('');
+    const [referredBy, setReferredBy] = useState('');
     const [submitted, setSubmitted] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
@@ -58,6 +59,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
             phone: phone.trim() || undefined,
             year: year || undefined,
             heardAbout: heardAbout || undefined,
+            referredBy: referredBy.trim() || undefined,
             role: Role.PROSPECTIVE,
             yearsInBPLT: 0,
         };
@@ -79,6 +81,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                 phone: member.phone,
                 year: member.year,
                 heard_about: member.heardAbout,
+                referred_by: member.referredBy,
             });
             if (error) throw error;
 
@@ -216,6 +219,19 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                             <option value="">-- Select --</option>
                             {HEARD_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
                         </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">
+                            Who recommended you? <span className="text-gray-400 font-normal">(optional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={referredBy}
+                            onChange={e => setReferredBy(e.target.value)}
+                            className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
+                            placeholder="A BearPit member's name"
+                        />
                     </div>
 
                     {existingMember && (
