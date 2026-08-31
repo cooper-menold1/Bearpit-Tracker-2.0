@@ -151,7 +151,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                 <div className="flex-1 overflow-auto bg-gray-50">
                     <div className="max-w-4xl mx-auto p-6 space-y-4">
                         {sortedGames.map(game => {
-                            const date = new Date(game.date);
+                            const date = parseLocalDate(game.date);
                             const sport = sports.find(s => s.id === game.sportId);
                             return (
                                 <div key={game.id} onClick={() => onDayClick(parseLocalDate(game.date))} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:bg-blue-50 cursor-pointer transition-colors group">
