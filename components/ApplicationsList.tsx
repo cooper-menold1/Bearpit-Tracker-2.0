@@ -226,7 +226,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             )}
                             {selectedWithEmail.length > 0 && (
                                 <button
-                                    onClick={() => downloadMailMergeCSV(selectedWithEmail, 'bearpit-applicants-mail-merge.csv')}
+                                    onClick={() => downloadMailMergeCSV(selectedWithEmail.map(m => ({ firstName: m.firstName, lastName: m.lastName, email: m.email! })), 'bearpit-applicants-mail-merge.csv')}
                                     title="Download a CSV to use with Outlook/Word Mail Merge -- sends a real individual 'Dear [First Name]' email to each person"
                                     className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-200"
                                 >

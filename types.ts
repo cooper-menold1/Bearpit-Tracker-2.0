@@ -4,6 +4,7 @@ export enum Role {
     OFFICER = 'Officer',
     MEMBER = 'Member',
     PROSPECTIVE = 'Prospective',
+    INACTIVE = 'Inactive',
 }
 
 export interface Member {

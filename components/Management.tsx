@@ -97,7 +97,7 @@ export const Management: React.FC<ManagementProps> = ({
     const [emailSubject, setEmailSubject] = useState('');
     const [emailBody, setEmailBody] = useState('');
 
-    const currentMembersAndAbove = members.filter(m => m.role !== Role.PROSPECTIVE);
+    const currentMembersAndAbove = members.filter(m => m.role !== Role.PROSPECTIVE && m.role !== Role.INACTIVE);
 
     const toggleEmailSelected = (id: string) => {
         setEmailSelectedIds(prev => {
@@ -606,7 +606,7 @@ export const Management: React.FC<ManagementProps> = ({
                                 <div className="flex items-center gap-3 flex-wrap">
                                     {emailSelectedWithEmail.length > 0 && (
                                         <button
-                                            onClick={() => downloadMailMergeCSV(emailSelectedWithEmail, 'bearpit-members-mail-merge.csv')}
+                                            onClick={() => downloadMailMergeCSV(emailSelectedWithEmail.map(m => ({ firstName: m.firstName, lastName: m.lastName, email: m.email! })), 'bearpit-members-mail-merge.csv')}
                                             title="Download a CSV to use with Outlook/Word Mail Merge -- sends a real individual 'Dear [First Name]' email to each person"
                                             className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-200"
                                         >
