@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Member, Game, Role, Sport, BonusPoint } from '../types';
 import { parseOutlookCSV } from '../utils/importUtils';
-import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail } from 'lucide-react';
+import { buildBulkMailto } from '../utils/emailTemplate';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
@@ -86,6 +87,35 @@ export const Management: React.FC<ManagementProps> = ({
     const [activeTab, setActiveTab] = useState<'members' | 'games' | 'points'>('games');
     const [selectedProfileMember, setSelectedProfileMember] = useState<Member | null>(null);
     const [showAutoFill, setShowAutoFill] = useState(false);
+
+    // Bulk email: select members (e.g. everyone Member/Officer/Admin) and
+    // compose one shared message -- for things like sending meeting notes
+    // out, where the content is different every time so there's no saved
+    // template the way the applicant welcome email has.
+    const [emailSelectedIds, setEmailSelectedIds] = useState<Set<string>>(new Set());
+    const [showEmailCompose, setShowEmailCompose] = useState(false);
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailBody, setEmailBody] = useState('');
+
+    const currentMembersAndAbove = members.filter(m => m.role !== Role.PROSPECTIVE);
+
+    const toggleEmailSelected = (id: string) => {
+        setEmailSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+    const allCurrentSelected = currentMembersAndAbove.length > 0 && currentMembersAndAbove.every(m => emailSelectedIds.has(m.id));
+    const toggleSelectAllCurrent = () => {
+        setEmailSelectedIds(allCurrentSelected ? new Set() : new Set(currentMembersAndAbove.map(m => m.id)));
+    };
+
+    const emailSelectedWithEmail = members.filter(m => emailSelectedIds.has(m.id) && m.email);
+    const emailSelectedMissingEmail = members.filter(m => emailSelectedIds.has(m.id) && !m.email).length;
+    const bulkMemberMailtoHref = emailSubject.trim() && emailSelectedWithEmail.length > 0
+        ? buildBulkMailto(emailSubject, emailBody, emailSelectedWithEmail.map(m => m.email!))
+        : undefined;
 
     useEffect(() => {
         if (members.length === 0) setActiveTab('games');
@@ -505,10 +535,77 @@ export const Management: React.FC<ManagementProps> = ({
                             {editingId && <button onClick={resetMemberForm} className="bg-gray-200 px-3 py-2 rounded"><X className="w-4 h-4" /></button>}
                         </div>
 
+                        <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
+                            <button
+                                onClick={() => {
+                                    if (!showEmailCompose) setEmailSelectedIds(new Set(currentMembersAndAbove.map(m => m.id)));
+                                    setShowEmailCompose(v => !v);
+                                }}
+                                className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200"
+                            >
+                                <Mail className="w-4 h-4" /> {showEmailCompose ? 'Close' : 'Email Members'}
+                            </button>
+                            {showEmailCompose && (
+                                <span className="text-xs text-gray-500">
+                                    Select recipients with the checkboxes below (defaults to everyone Member/Officer/Admin).
+                                </span>
+                            )}
+                        </div>
+
+                        {showEmailCompose && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 shrink-0 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-bold text-amber-900 text-sm">Compose (e.g. meeting notes)</h4>
+                                    <button onClick={toggleSelectAllCurrent} className="text-xs font-bold text-amber-700 hover:text-amber-900 underline">
+                                        {allCurrentSelected ? 'Deselect all Members+' : 'Select all Members+'}
+                                    </button>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={emailSubject}
+                                    onChange={e => setEmailSubject(e.target.value)}
+                                    placeholder="Subject (e.g. Bear Pit Meeting Notes -- 8/31)"
+                                    className="w-full border border-amber-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+                                />
+                                <textarea
+                                    value={emailBody}
+                                    onChange={e => setEmailBody(e.target.value)}
+                                    placeholder="Paste the meeting notes / message here..."
+                                    rows={8}
+                                    className="w-full border border-amber-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+                                />
+                                <p className="text-xs text-amber-700">
+                                    A very long message to a large group may not fully open in your email app -- if that
+                                    happens, copy this text in manually.
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    {bulkMemberMailtoHref ? (
+                                        <a
+                                            href={bulkMemberMailtoHref}
+                                            title="Opens one email addressed (bcc) to everyone selected"
+                                            className="inline-flex items-center gap-2 bg-[#154734] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#0e3022]"
+                                        >
+                                            <Mail className="w-4 h-4" /> Open Email ({emailSelectedWithEmail.length} recipients)
+                                        </a>
+                                    ) : (
+                                        <span className="text-xs text-gray-500">Add a subject and select at least one recipient with an email on file.</span>
+                                    )}
+                                    {emailSelectedMissingEmail > 0 && (
+                                        <span className="text-xs text-amber-600">{emailSelectedMissingEmail} selected have no email and will be skipped</span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-50 text-gray-700 sticky top-0">
                                     <tr>
+                                        {showEmailCompose && (
+                                            <th className="px-4 py-3 w-8">
+                                                <input type="checkbox" checked={allCurrentSelected} onChange={toggleSelectAllCurrent} aria-label="Select all current members" />
+                                            </th>
+                                        )}
                                         <th className="px-4 py-3">Name</th>
                                         <th className="px-4 py-3">Role</th>
                                         <th className="px-4 py-3 text-right">Actions</th>
@@ -517,6 +614,11 @@ export const Management: React.FC<ManagementProps> = ({
                                 <tbody className="divide-y">
                                     {members.map(m => (
                                         <tr key={m.id} className="hover:bg-gray-50">
+                                            {showEmailCompose && (
+                                                <td className="px-4 py-3">
+                                                    <input type="checkbox" checked={emailSelectedIds.has(m.id)} onChange={() => toggleEmailSelected(m.id)} aria-label={`Select ${m.firstName} ${m.lastName}`} />
+                                                </td>
+                                            )}
                                             <td className="px-4 py-3">
                                                 <button
                                                     onClick={() => setSelectedProfileMember(m)}

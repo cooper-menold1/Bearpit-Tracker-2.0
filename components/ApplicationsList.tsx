@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, Role, EmailTemplate } from '../types';
 import { Users, Mail, Settings2, Save, Eye, EyeOff } from 'lucide-react';
-import { renderEmailTemplate, buildMailto } from '../utils/emailTemplate';
+import { renderEmailTemplate, buildMailto, buildBulkMailto } from '../utils/emailTemplate';
 
 interface ApplicationsListProps {
     data: AppState;
@@ -26,6 +26,31 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
     const [showConfig, setShowConfig] = useState(!data.emailTemplate);
     const [showPreview, setShowPreview] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const toggleSelected = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+    const allSelected = prospective.length > 0 && prospective.every(m => selectedIds.has(m.id));
+    const toggleSelectAll = () => {
+        setSelectedIds(allSelected ? new Set() : new Set(prospective.map(m => m.id)));
+    };
+
+    const selectedWithEmail = prospective.filter(m => selectedIds.has(m.id) && m.email);
+    const selectedMissingEmail = prospective.filter(m => selectedIds.has(m.id) && !m.email).length;
+    // Bulk send can't merge a different {{first_name}} per recipient the way
+    // the one-at-a-time mailto does, so it renders once with a generic
+    // greeting shared by everyone in the bcc.
+    const bulkMailtoHref = data.emailTemplate && selectedWithEmail.length > 0
+        ? (() => {
+            const { subject, body } = renderEmailTemplate(data.emailTemplate, { id: '', firstName: '', lastName: '', role: Role.PROSPECTIVE, yearsInBPLT: 0 });
+            return buildBulkMailto(subject, body, selectedWithEmail.map(m => m.email!));
+        })()
+        : undefined;
 
     useEffect(() => {
         if (data.emailTemplate) setForm(data.emailTemplate);
@@ -159,18 +184,43 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-lg text-blue-700">
-                        <Users className="w-6 h-6" />
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-lg text-blue-700">
+                            <Users className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-[#154734]">Membership Applications</h2>
+                            <p className="text-gray-500 text-sm">People who filled out "Interested in Joining?"</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-[#154734]">Membership Applications</h2>
-                        <p className="text-gray-500 text-sm">People who filled out "Interested in Joining?"</p>
-                    </div>
+                    {selectedIds.size > 0 && (
+                        <div className="flex items-center gap-2">
+                            {selectedMissingEmail > 0 && (
+                                <span className="text-xs text-amber-600">{selectedMissingEmail} selected with no email will be skipped</span>
+                            )}
+                            {bulkMailtoHref ? (
+                                <a
+                                    href={bulkMailtoHref}
+                                    title="Opens one email addressed (bcc) to everyone selected"
+                                    className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200"
+                                >
+                                    <Mail className="w-4 h-4" /> Email Selected ({selectedWithEmail.length})
+                                </a>
+                            ) : (
+                                <span className="text-xs text-gray-400" title="Save a welcome-email template above first">
+                                    Save a template above to email selected applicants
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 text-gray-700 uppercase text-xs">
                         <tr>
+                            <th className="px-4 py-3 w-8">
+                                <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all applicants" />
+                            </th>
                             <th className="px-6 py-3">Name</th>
                             <th className="px-6 py-3">Email</th>
                             <th className="px-6 py-3">Phone</th>
@@ -185,6 +235,9 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             const mailtoHref = data.emailTemplate && m.email ? buildMailto(data.emailTemplate, m) : undefined;
                             return (
                                 <tr key={m.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-4">
+                                        <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelected(m.id)} aria-label={`Select ${m.firstName} ${m.lastName}`} />
+                                    </td>
                                     <td className="px-6 py-4 font-bold text-gray-900">{m.firstName} {m.lastName}</td>
                                     <td className="px-6 py-4 text-blue-600">{m.email || 'No Email'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.phone || '—'}</td>
@@ -212,7 +265,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             );
                         })}
                         {prospective.length === 0 && (
-                            <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-400 italic">No pending applications.</td></tr>
+                            <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 italic">No pending applications.</td></tr>
                         )}
                     </tbody>
                 </table>

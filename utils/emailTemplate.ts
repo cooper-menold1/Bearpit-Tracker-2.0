@@ -26,3 +26,16 @@ export const buildMailto = (template: EmailTemplate, member: Member): string => 
     const to = encodeURIComponent(member.email || '');
     return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
+
+// One shared email to many people at once, via bcc so recipients don't see
+// each other's addresses. Opens in whichever mail client/account the browser
+// hands mailto: links to -- there's no "from" to set here, that's determined
+// by the sender's own default mail app (e.g. signed into bear_pit@baylor.edu).
+export const buildBulkMailto = (subject: string, body: string, emails: string[]): string => {
+    // Deliberately not encodeURIComponent-ing the whole joined list: percent-
+    // encoding the comma (%2C) between addresses trips up some mail clients'
+    // mailto bcc parsing (notably Outlook), which expect a literal comma.
+    // Plain email addresses don't contain characters that need escaping.
+    const bcc = emails.join(',');
+    return `mailto:?bcc=${bcc}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+};
