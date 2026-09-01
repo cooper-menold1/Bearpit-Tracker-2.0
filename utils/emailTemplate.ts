@@ -39,3 +39,32 @@ export const buildBulkMailto = (subject: string, body: string, emails: string[])
     const bcc = emails.join(',');
     return `mailto:?bcc=${bcc}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
+
+const escapeCsvField = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+
+// A CSV data source for Outlook/Word Mail Merge (Mailings tab -> Start Mail
+// Merge -> E-mail Messages -> Select Recipients -> Use an Existing List).
+// This is the actual way to send genuinely individualized emails (a real
+// "Dear <First Name>" per person, sent as separate messages) from
+// bear_pit@baylor.edu at no cost and no per-recipient click -- a bcc blast
+// can't do that since every bcc'd recipient shares one identical body.
+export const downloadMailMergeCSV = (
+    recipients: { firstName: string; lastName: string; email: string }[],
+    filename: string
+): void => {
+    const header = ['First Name', 'Last Name', 'Email Address'];
+    const lines = [header.map(escapeCsvField).join(',')];
+    recipients.forEach(r => {
+        lines.push([r.firstName, r.lastName, r.email].map(escapeCsvField).join(','));
+    });
+    const csvContent = lines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, Role, EmailTemplate } from '../types';
-import { Users, Mail, Settings2, Save, Eye, EyeOff, Copy, Check } from 'lucide-react';
-import { renderEmailTemplate, buildMailto, buildBulkMailto } from '../utils/emailTemplate';
+import { Users, Mail, Settings2, Save, Eye, EyeOff, Copy, Check, FileSpreadsheet } from 'lucide-react';
+import { renderEmailTemplate, buildMailto, buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
 
 interface ApplicationsListProps {
     data: AppState;
@@ -223,6 +223,15 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                         <div className="flex items-center gap-2">
                             {selectedMissingEmail > 0 && (
                                 <span className="text-xs text-amber-600">{selectedMissingEmail} selected with no email will be skipped</span>
+                            )}
+                            {selectedWithEmail.length > 0 && (
+                                <button
+                                    onClick={() => downloadMailMergeCSV(selectedWithEmail, 'bearpit-applicants-mail-merge.csv')}
+                                    title="Download a CSV to use with Outlook/Word Mail Merge -- sends a real individual 'Dear [First Name]' email to each person"
+                                    className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-200"
+                                >
+                                    <FileSpreadsheet className="w-4 h-4" /> Export for Mail Merge ({selectedWithEmail.length})
+                                </button>
                             )}
                             {bulkMailtoHref ? (
                                 <a

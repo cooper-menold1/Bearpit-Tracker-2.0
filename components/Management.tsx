@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Member, Game, Role, Sport, BonusPoint } from '../types';
 import { parseOutlookCSV } from '../utils/importUtils';
-import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check } from 'lucide-react';
-import { buildBulkMailto } from '../utils/emailTemplate';
+import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet } from 'lucide-react';
+import { buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
@@ -603,7 +603,16 @@ export const Management: React.FC<ManagementProps> = ({
                                     A very long message to a large group may not fully open in your email app -- if that
                                     happens, copy this text in manually.
                                 </p>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    {emailSelectedWithEmail.length > 0 && (
+                                        <button
+                                            onClick={() => downloadMailMergeCSV(emailSelectedWithEmail, 'bearpit-members-mail-merge.csv')}
+                                            title="Download a CSV to use with Outlook/Word Mail Merge -- sends a real individual 'Dear [First Name]' email to each person"
+                                            className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-200"
+                                        >
+                                            <FileSpreadsheet className="w-4 h-4" /> Export for Mail Merge ({emailSelectedWithEmail.length})
+                                        </button>
+                                    )}
                                     {bulkMemberMailtoHref ? (
                                         <a
                                             href={bulkMemberMailtoHref}
