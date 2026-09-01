@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Search, Check, AlertCircle, Loader2, Calendar as CalendarIcon, Info, Trophy, ChevronRight, Plus, MapPin, Clock } from 'lucide-react';
 import { Game, Sport, Role } from '../types';
 import { fetchSchedule, ScrapedGame, resolveSportMappings } from '../utils/scraper';
+import { parseLocalDate, formatLocalDate } from '../utils/dateUtils';
 
 interface AutoFillModalProps {
     isOpen: boolean;
@@ -115,8 +116,8 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                 meetingSportId = await onAddSport('Meetings');
             }
 
-            const start = new Date(meetingConfig.startDate);
-            const end = new Date(meetingConfig.endDate);
+            const start = parseLocalDate(meetingConfig.startDate);
+            const end = parseLocalDate(meetingConfig.endDate);
             const meetingsToAdd = [];
 
             let current = new Date(start);
@@ -125,7 +126,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
             }
 
             while (current <= end) {
-                const dateStr = current.toISOString().split('T')[0];
+                const dateStr = formatLocalDate(current);
                 const existing = existingGames.find(g => g.date === dateStr && g.sportId === meetingSportId);
                 
                 if (!existing) {
