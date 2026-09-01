@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Member, Game, Role, Sport, BonusPoint } from '../types';
 import { parseOutlookCSV } from '../utils/importUtils';
-import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check } from 'lucide-react';
 import { buildBulkMailto } from '../utils/emailTemplate';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
@@ -116,6 +116,19 @@ export const Management: React.FC<ManagementProps> = ({
     const bulkMemberMailtoHref = emailSubject.trim() && emailSelectedWithEmail.length > 0
         ? buildBulkMailto(emailSubject, emailBody, emailSelectedWithEmail.map(m => m.email!))
         : undefined;
+
+    const [memberEmailsCopied, setMemberEmailsCopied] = useState(false);
+    // Copies everyone Member/Officer/Admin's email regardless of the compose
+    // panel's selection state -- paste into Outlook's To/Bcc field alongside
+    // a template pasted in manually, as a fallback that doesn't depend on
+    // mailto: links or a particular default mail app being set up correctly.
+    const copyAllCurrentMemberEmails = () => {
+        const emails = currentMembersAndAbove.filter(m => m.email).map(m => m.email!);
+        navigator.clipboard.writeText(emails.join('; ')).then(() => {
+            setMemberEmailsCopied(true);
+            setTimeout(() => setMemberEmailsCopied(false), 2000);
+        });
+    };
 
     useEffect(() => {
         if (members.length === 0) setActiveTab('games');
@@ -536,15 +549,27 @@ export const Management: React.FC<ManagementProps> = ({
                         </div>
 
                         <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
-                            <button
-                                onClick={() => {
-                                    if (!showEmailCompose) setEmailSelectedIds(new Set(currentMembersAndAbove.map(m => m.id)));
-                                    setShowEmailCompose(v => !v);
-                                }}
-                                className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200"
-                            >
-                                <Mail className="w-4 h-4" /> {showEmailCompose ? 'Close' : 'Email Members'}
-                            </button>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    onClick={() => {
+                                        if (!showEmailCompose) setEmailSelectedIds(new Set(currentMembersAndAbove.map(m => m.id)));
+                                        setShowEmailCompose(v => !v);
+                                    }}
+                                    className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200"
+                                >
+                                    <Mail className="w-4 h-4" /> {showEmailCompose ? 'Close' : 'Email Members'}
+                                </button>
+                                {currentMembersAndAbove.some(m => m.email) && (
+                                    <button
+                                        onClick={copyAllCurrentMemberEmails}
+                                        title="Copies every current Member/Officer/Admin's email, semicolon-separated -- paste into Outlook's To/Bcc field"
+                                        className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-200"
+                                    >
+                                        {memberEmailsCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                                        {memberEmailsCopied ? 'Copied!' : 'Copy All Emails'}
+                                    </button>
+                                )}
+                            </div>
                             {showEmailCompose && (
                                 <span className="text-xs text-gray-500">
                                     Select recipients with the checkboxes below (defaults to everyone Member/Officer/Admin).

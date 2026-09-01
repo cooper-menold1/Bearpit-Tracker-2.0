@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, Role, EmailTemplate } from '../types';
-import { Users, Mail, Settings2, Save, Eye, EyeOff } from 'lucide-react';
+import { Users, Mail, Settings2, Save, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { renderEmailTemplate, buildMailto, buildBulkMailto } from '../utils/emailTemplate';
 
 interface ApplicationsListProps {
@@ -27,6 +27,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
     const [showPreview, setShowPreview] = useState(false);
     const [saved, setSaved] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [emailsCopied, setEmailsCopied] = useState(false);
 
     const toggleSelected = (id: string) => {
         setSelectedIds(prev => {
@@ -51,6 +52,18 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
             return buildBulkMailto(subject, body, selectedWithEmail.map(m => m.email!));
         })()
         : undefined;
+
+    // Copies every applicant's email regardless of checkbox selection --
+    // paste straight into Outlook's To/Bcc field alongside a template
+    // pasted in manually, as a fallback that doesn't depend on mailto:
+    // links or a particular default mail app being set up correctly.
+    const copyAllEmails = () => {
+        const emails = prospective.filter(m => m.email).map(m => m.email!);
+        navigator.clipboard.writeText(emails.join('; ')).then(() => {
+            setEmailsCopied(true);
+            setTimeout(() => setEmailsCopied(false), 2000);
+        });
+    };
 
     useEffect(() => {
         if (data.emailTemplate) setForm(data.emailTemplate);
@@ -193,6 +206,18 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             <h2 className="text-xl font-bold text-[#154734]">Membership Applications</h2>
                             <p className="text-gray-500 text-sm">People who filled out "Interested in Joining?"</p>
                         </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {prospective.some(m => m.email) && (
+                            <button
+                                onClick={copyAllEmails}
+                                title="Copies every applicant's email, semicolon-separated -- paste into Outlook's To/Bcc field"
+                                className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-200"
+                            >
+                                {emailsCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                                {emailsCopied ? 'Copied!' : 'Copy All Emails'}
+                            </button>
+                        )}
                     </div>
                     {selectedIds.size > 0 && (
                         <div className="flex items-center gap-2">
