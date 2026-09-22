@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { INITIAL_STATE, LOGO_URL } from './constants';
-import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate } from './types';
+import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate, ClubEvent } from './types';
 import { Login } from './components/Login';
 import { AttendanceForm, AttendanceLocation } from './components/AttendanceForm';
 import { InterestForm } from './components/InterestForm';
@@ -119,7 +119,9 @@ function App() {
             { data: attendance },
             { data: bonusPoints },
             { data: selfieVotes },
-            { data: emailTemplateRow }
+            { data: emailTemplateRow },
+            clubEventsRes,
+            eventSignupsRes
         ] = await Promise.all([
             supabase.from('sports').select('*'),
             supabase.from('games').select('*'),
@@ -129,8 +131,13 @@ function App() {
             supabase.from('bonus_points').select('*'),
             supabase.from('selfie_votes').select('*'),
             // Falls back to null if the migration hasn't been run yet -- not fatal.
-            supabase.from('email_templates').select('*').eq('id', 'prospective_welcome').maybeSingle()
+            supabase.from('email_templates').select('*').eq('id', 'prospective_welcome').maybeSingle(),
+            // Falls back to empty if the club_events migration hasn't been run yet -- not fatal.
+            supabase.from('club_events').select('*'),
+            supabase.from('event_signups').select('*')
         ]);
+        const clubEvents = clubEventsRes.data;
+        const eventSignups = eventSignupsRes.data;
 
         const attendanceMap: Record<string, Record<string, boolean>> = {};
         attendance?.forEach((record: any) => {
@@ -192,6 +199,11 @@ function App() {
             sports: mappedSports,
             selfieVotes: (selfieVotes || []).map((v: any) => ({ selfieId: v.selfie_id, memberId: v.member_id })),
             bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date, category: b.category || 'Other' })),
+            clubEvents: (clubEvents || []).map((e: any) => ({
+                id: e.id, title: e.title, category: e.category || 'Tabling', date: e.date, time: e.time,
+                location: e.location, maxSignups: e.max_signups ?? 2, pointsValue: e.points_value ?? 1, description: e.description
+            })),
+            eventSignups: (eventSignups || []).map((s: any) => ({ id: s.id, eventId: s.event_id, memberId: s.member_id, bonusPointId: s.bonus_point_id, timestamp: s.timestamp })),
             emailTemplate: mappedEmailTemplate
         }));
     };
@@ -231,6 +243,9 @@ function App() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'sports' }, () => fetchCoreData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'selfies' }, () => fetchSelfies())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'email_templates' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_points' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'club_events' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'event_signups' }, () => fetchCoreData())
             .subscribe();
         return () => { supabase.removeChannel(channels); };
     }, []);
@@ -446,6 +461,79 @@ function App() {
         fetchCoreData();
     };
 
+    // --- Club Events (tabling signups etc) ---
+
+    const handleAddClubEvent = async (event: Omit<ClubEvent, 'id'>) => {
+        await supabase.from('club_events').insert({
+            title: event.title,
+            category: event.category,
+            date: event.date,
+            time: event.time || null,
+            location: event.location || null,
+            max_signups: event.maxSignups,
+            points_value: event.pointsValue,
+            description: event.description || null,
+        });
+        await fetchCoreData();
+    };
+
+    const handleDeleteClubEvent = async (id: string) => {
+        if (window.confirm("Delete this event? Any existing signups (and the points they awarded) will be removed too.")) {
+            await supabase.from('club_events').delete().eq('id', id);
+            await fetchCoreData();
+        }
+    };
+
+    // Signing up both claims a slot and awards the event's points in one
+    // step, per the call: "make sure to get your points, your table and
+    // do you sign up" -- members shouldn't have to do a separate step.
+    const handleSignUpForEvent = async (eventId: string, memberId: string) => {
+        const event = data.clubEvents.find(e => e.id === eventId);
+        if (!event) return;
+        const alreadySignedUp = data.eventSignups.some(s => s.eventId === eventId && s.memberId === memberId);
+        if (alreadySignedUp) return;
+        const takenSlots = data.eventSignups.filter(s => s.eventId === eventId).length;
+        if (takenSlots >= event.maxSignups) {
+            alert("This event is already full.");
+            return;
+        }
+        const { data: bp } = await supabase.from('bonus_points').insert({
+            member_id: memberId,
+            points: event.pointsValue,
+            reason: event.title,
+            category: event.category,
+            date: new Date().toISOString(),
+        }).select('id').single();
+        await supabase.from('event_signups').insert({
+            event_id: eventId,
+            member_id: memberId,
+            bonus_point_id: bp?.id ?? null,
+        });
+        await fetchCoreData();
+    };
+
+    // Cancelling a signup also reverses the points it awarded, so someone
+    // backing out of a tabling shift doesn't keep credit for it.
+    const handleCancelSignup = async (signupId: string) => {
+        const signup = data.eventSignups.find(s => s.id === signupId);
+        if (!signup) return;
+        await supabase.from('event_signups').delete().eq('id', signupId);
+        if (signup.bonusPointId) await supabase.from('bonus_points').delete().eq('id', signup.bonusPointId);
+        await fetchCoreData();
+    };
+
+    // Bulk-award the same category/points/reason to several members at
+    // once -- for things an officer notices rather than a member
+    // self-reports (hospitality duty, photography, etc), per the call's
+    // "we could make an excel sheet... instead have officers log it".
+    const handleBulkAwardPoints = async (memberIds: string[], points: number, reason: string, category: string) => {
+        const rows = memberIds.map(memberId => ({
+            member_id: memberId, points, reason, category, date: new Date().toISOString(),
+        }));
+        await supabase.from('bonus_points').insert(rows);
+        await fetchCoreData();
+    };
+
     const renderContent = () => {
         if (isLoading) return <div className="flex items-center justify-center h-full"><RefreshCw className="w-8 h-8 animate-spin text-green-700" /></div>;
         if (currentView === 'dashboard') return <Dashboard data={data} />;
@@ -480,6 +568,11 @@ function App() {
                     await supabase.from('bonus_points').delete().eq('id', id);
                     fetchCoreData();
                 }}
+                onBulkAwardPoints={handleBulkAwardPoints}
+                clubEvents={data.clubEvents}
+                eventSignups={data.eventSignups}
+                onAddClubEvent={handleAddClubEvent}
+                onDeleteClubEvent={handleDeleteClubEvent}
                 onAddSport={handleAddSport}
                 userRole={currentMember?.role}
             />
@@ -510,7 +603,7 @@ function App() {
     if (mode === 'interest') return <InterestForm members={data.members} onSubmit={handleAddMember} onBack={handleLogout} />;
     if (mode === 'member' && currentMember) return (
         <Suspense fallback={<div className="h-screen bg-[#154734] flex items-center justify-center text-white"><RefreshCw className="w-10 h-10 animate-spin" /></div>}>
-            <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} />
+            <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} onAddClubEvent={handleAddClubEvent} onDeleteClubEvent={handleDeleteClubEvent} onSignUpForEvent={handleSignUpForEvent} onCancelSignup={handleCancelSignup} />
         </Suspense>
     );
 

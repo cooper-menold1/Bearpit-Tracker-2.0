@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
-import { Member, AppState, Game, Role } from '../types';
-import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp } from 'lucide-react';
+import { Member, AppState, Game, Role, ClubEvent } from '../types';
+import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus } from 'lucide-react';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { Management } from './Management';
@@ -20,10 +20,14 @@ interface MemberPortalProps {
     onDeleteGame?: (id: string) => void;
     onVote: (selfieId: string, memberId: string) => void;
     sports?: any[];
+    onAddClubEvent?: (event: Omit<ClubEvent, 'id'>) => void;
+    onDeleteClubEvent?: (id: string) => void;
+    onSignUpForEvent?: (eventId: string, memberId: string) => void;
+    onCancelSignup?: (signupId: string) => void;
 }
 
-export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports }) => {
-    const [view, setView] = useState<'leaderboard' | 'vote' | 'stats' | 'calendar' | 'edit_calendar'>('leaderboard');
+export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports, onAddClubEvent, onDeleteClubEvent, onSignUpForEvent, onCancelSignup }) => {
+    const [view, setView] = useState<'leaderboard' | 'vote' | 'stats' | 'calendar' | 'events' | 'edit_calendar'>('leaderboard');
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
     const [showDayModal, setShowDayModal] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -159,6 +163,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                         >
                             <CalendarIcon className="w-4 h-4" /> Calendar
                         </button>
+                        <button
+                            onClick={() => setView('events')}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-bold transition-all ${view === 'events' ? 'bg-white text-[#154734] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <ClipboardList className="w-4 h-4" /> Sign Up
+                        </button>
                         {canEdit && (
                             <button
                                 onClick={() => setView('edit_calendar')}
@@ -185,14 +195,22 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                 members={[]}
                                 games={data.games}
                                 sports={sports}
+                                bonusPoints={[]}
                                 onAddMember={() => { }}
                                 onDeleteMember={() => { }}
                                 onAddGame={onAddGame}
                                 onDeleteGame={onDeleteGame}
+                                onUpdateProfile={onUpdateProfile}
+                                onAddBonusPoint={() => { }}
+                                onDeleteBonusPoint={() => { }}
+                                clubEvents={data.clubEvents}
+                                eventSignups={data.eventSignups}
+                                onAddClubEvent={onAddClubEvent}
+                                onDeleteClubEvent={onDeleteClubEvent}
                                 userRole={member.role}
                             />
                             <div className="mt-2 text-center text-xs text-gray-400">
-                                Restricted View: Member management disabled in this portal.
+                                Restricted View: Member management &amp; the Points Manager tab are disabled in this portal. Use Club Events here to create tabling signups.
                             </div>
                         </div>
                     </div>
@@ -278,6 +296,59 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                     <div className="p-8 text-center text-gray-500">
                                         No points activity yet.
                                     </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ) : view === 'events' ? (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <ClipboardList className="w-4 h-4" /> Sign Up for a Club Event
+                                </h3>
+                                <p className="text-xs text-gray-500 mt-1">Tabling shifts and other club events. Signing up claims a slot and awards the points automatically.</p>
+                            </div>
+                            <div className="divide-y divide-gray-100">
+                                {[...data.clubEvents].sort((a, b) => a.date.localeCompare(b.date)).map(ev => {
+                                    const taken = data.eventSignups.filter(s => s.eventId === ev.id).length;
+                                    const mySignup = data.eventSignups.find(s => s.eventId === ev.id && s.memberId === member.id);
+                                    const isFull = taken >= ev.maxSignups;
+                                    return (
+                                        <div key={ev.id} className="p-4 flex items-center justify-between gap-4 hover:bg-gray-50">
+                                            <div>
+                                                <p className="font-bold text-gray-900">{ev.title}</p>
+                                                <div className="flex items-center gap-3 text-xs text-gray-500 mt-1 flex-wrap">
+                                                    <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {ev.date}{ev.time ? ` · ${ev.time}` : ''}</span>
+                                                    {ev.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {ev.location}</span>}
+                                                    <span className="bg-[#154734]/10 text-[#154734] font-bold px-2 py-0.5 rounded-full">{ev.category} · +{ev.pointsValue} pts</span>
+                                                    <span className={`font-bold ${isFull ? 'text-red-500' : 'text-gray-500'}`}>{taken}/{ev.maxSignups} slots filled</span>
+                                                </div>
+                                                {ev.description && <p className="text-xs text-gray-400 mt-1">{ev.description}</p>}
+                                            </div>
+                                            {mySignup ? (
+                                                <button
+                                                    onClick={() => onCancelSignup?.(mySignup.id)}
+                                                    className="flex items-center gap-1 text-sm font-bold text-white bg-green-600 hover:bg-red-500 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+                                                    title="Click to cancel your signup"
+                                                >
+                                                    <CheckCircle2 className="w-4 h-4" /> You're In
+                                                </button>
+                                            ) : isFull ? (
+                                                <span className="text-sm font-bold text-gray-400 px-3 py-1.5 shrink-0">Full</span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => onSignUpForEvent?.(ev.id, member.id)}
+                                                    className="flex items-center gap-1 text-sm font-bold text-[#154734] bg-[#FFB81C] hover:bg-yellow-400 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+                                                >
+                                                    <Plus className="w-4 h-4" /> Sign Up
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {data.clubEvents.length === 0 && (
+                                    <div className="p-8 text-center text-gray-500">No club events posted yet — check back soon.</div>
                                 )}
                             </div>
                         </div>

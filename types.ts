@@ -96,6 +96,29 @@ export interface AttendanceRecord {
     };
 }
 
+// A non-game "club event" a member can sign up for -- tabling, primarily,
+// but generic enough for any slot-based club activity. Signing up awards
+// points in `category` automatically (see EventSignup.bonusPointId).
+export interface ClubEvent {
+    id: string;
+    title: string; // e.g. "Tabling - Fountain Mall"
+    category: string; // one of constants.ts POINT_CATEGORIES
+    date: string; // YYYY-MM-DD
+    time?: string; // 24h "HH:MM"
+    location?: string;
+    maxSignups: number; // open slots at once, e.g. 2-3 people tabling
+    pointsValue: number; // points awarded per signup
+    description?: string;
+}
+
+export interface EventSignup {
+    id: string;
+    eventId: string;
+    memberId: string;
+    bonusPointId?: string; // the BonusPoint row this signup awarded, so cancelling reverses it
+    timestamp: string;
+}
+
 export interface AppState {
     members: Member[];
     sports: Sport[];
@@ -104,6 +127,8 @@ export interface AppState {
     selfies: Selfie[];
     bonusPoints: BonusPoint[]; // New field
     selfieVotes: SelfieVote[]; // New field
+    clubEvents: ClubEvent[];
+    eventSignups: EventSignup[];
     settings: Settings;
     emailTemplate: EmailTemplate | null;
 }

@@ -105,5 +105,7 @@ export const INITIAL_STATE: AppState = {
   selfies: [],
   bonusPoints: [],
   selfieVotes: [],
+  clubEvents: [],
+  eventSignups: [],
   emailTemplate: null
 };

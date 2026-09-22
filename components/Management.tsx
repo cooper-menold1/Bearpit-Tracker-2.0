@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Member, Game, Role, Sport, BonusPoint } from '../types';
+import { Member, Game, Role, Sport, BonusPoint, ClubEvent, EventSignup } from '../types';
 import { POINT_CATEGORIES } from '../constants';
 import { parseOutlookCSV } from '../utils/importUtils';
 import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet } from 'lucide-react';
@@ -66,6 +66,11 @@ interface ManagementProps {
     onUpdateProfile: (updates: Partial<Member>) => void;
     onAddBonusPoint: (memberId: string, points: number, reason: string, category?: string) => void;
     onDeleteBonusPoint: (id: string) => void;
+    onBulkAwardPoints?: (memberIds: string[], points: number, reason: string, category: string) => void;
+    clubEvents?: ClubEvent[];
+    eventSignups?: EventSignup[];
+    onAddClubEvent?: (event: Omit<ClubEvent, 'id'>) => void;
+    onDeleteClubEvent?: (id: string) => void;
     onAddSport?: (name: string) => Promise<string>;
     userRole?: Role;
 }
@@ -82,10 +87,15 @@ export const Management: React.FC<ManagementProps> = ({
     onUpdateProfile,
     onAddBonusPoint,
     onDeleteBonusPoint,
+    onBulkAwardPoints,
+    clubEvents = [],
+    eventSignups = [],
+    onAddClubEvent,
+    onDeleteClubEvent,
     onAddSport,
     userRole
 }) => {
-    const [activeTab, setActiveTab] = useState<'members' | 'games' | 'points'>('games');
+    const [activeTab, setActiveTab] = useState<'members' | 'games' | 'points' | 'events'>('games');
     const [selectedProfileMember, setSelectedProfileMember] = useState<Member | null>(null);
     const [showAutoFill, setShowAutoFill] = useState(false);
 
@@ -161,6 +171,45 @@ export const Management: React.FC<ManagementProps> = ({
     const [pointsReason, setPointsReason] = useState<string>('');
     const [pointsCategory, setPointsCategory] = useState<string>(POINT_CATEGORIES[0]);
 
+    // Bulk Award State -- same category/points/reason applied to several
+    // members at once, for things an officer notices rather than a member
+    // self-reports (hospitality duty, photography, etc).
+    const [showBulkAward, setShowBulkAward] = useState(false);
+    const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkPoints, setBulkPoints] = useState<number>(1);
+    const [bulkReason, setBulkReason] = useState<string>('');
+    const [bulkCategory, setBulkCategory] = useState<string>(POINT_CATEGORIES[0]);
+    const toggleBulkSelected = (id: string) => {
+        setBulkSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+    const handleSubmitBulkAward = () => {
+        if (bulkSelectedIds.size === 0 || bulkPoints === 0 || !bulkReason || !onBulkAwardPoints) {
+            alert("Select at least one member, a reason, and non-zero points.");
+            return;
+        }
+        onBulkAwardPoints(Array.from(bulkSelectedIds), bulkPoints, bulkReason, bulkCategory);
+        setBulkSelectedIds(new Set());
+        setBulkPoints(1);
+        setBulkReason('');
+    };
+
+    // Club Events (tabling signups) State
+    const [eventForm, setEventForm] = useState({
+        title: '', category: POINT_CATEGORIES.includes('Tabling') ? 'Tabling' : POINT_CATEGORIES[0],
+        date: '', time: '', location: '', maxSignups: 2, pointsValue: 1, description: ''
+    });
+    const handleSubmitEvent = () => {
+        if (!eventForm.title || !eventForm.date || !onAddClubEvent) {
+            alert("Please fill in at least a title and date.");
+            return;
+        }
+        onAddClubEvent({ ...eventForm });
+        setEventForm({ title: '', category: eventForm.category, date: '', time: '', location: '', maxSignups: 2, pointsValue: 1, description: '' });
+    };
 
     // Modal States
     const [showGameModal, setShowGameModal] = useState(false);
@@ -343,6 +392,12 @@ export const Management: React.FC<ManagementProps> = ({
                     className={`pb-2 px-4 font-medium transition-colors whitespace-nowrap ${activeTab === 'points' ? 'text-[#154734] border-b-2 border-[#154734]' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                     Points Manager
+                </button>
+                <button
+                    onClick={() => { setActiveTab('events'); resetGameForm(); }}
+                    className={`pb-2 px-4 font-medium transition-colors whitespace-nowrap ${activeTab === 'events' ? 'text-[#154734] border-b-2 border-[#154734]' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    Club Events
                 </button>
             </div>
 
@@ -736,7 +791,51 @@ export const Management: React.FC<ManagementProps> = ({
                                     Apply Points
                                 </button>
                             </div>
+                            <button
+                                onClick={() => setShowBulkAward(v => !v)}
+                                className="mt-4 text-sm font-bold text-[#154734] hover:underline flex items-center gap-1"
+                            >
+                                {showBulkAward ? 'Hide' : 'Award the same points to multiple members at once →'}
+                            </button>
                         </div>
+
+                        {showBulkAward && (
+                            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm shrink-0">
+                                <h3 className="font-bold text-[#154734] mb-1 flex items-center gap-2">
+                                    <Trophy className="w-5 h-5" /> Bulk Award
+                                </h3>
+                                <p className="text-xs text-gray-500 mb-4">
+                                    For things members can't self-report and you notice as a group — e.g. everyone on hospitality duty at Saturday's game.
+                                </p>
+                                <div className="max-h-40 overflow-y-auto border rounded-lg p-2 mb-4 grid grid-cols-2 md:grid-cols-3 gap-1">
+                                    {members.sort((a, b) => a.firstName.localeCompare(b.firstName)).map(m => (
+                                        <label key={m.id} className="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
+                                            <input type="checkbox" checked={bulkSelectedIds.has(m.id)} onChange={() => toggleBulkSelected(m.id)} />
+                                            {m.firstName} {m.lastName}
+                                        </label>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500">Category</label>
+                                        <select className="w-full border p-2 rounded" value={bulkCategory} onChange={e => setBulkCategory(e.target.value)}>
+                                            {POINT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500">Points (+/-)</label>
+                                        <input type="number" className="w-full border p-2 rounded" value={bulkPoints} onChange={e => setBulkPoints(Number(e.target.value))} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500">Reason</label>
+                                        <input type="text" className="w-full border p-2 rounded" value={bulkReason} onChange={e => setBulkReason(e.target.value)} placeholder="e.g. Hospitality duty at BSB game" />
+                                    </div>
+                                    <button onClick={handleSubmitBulkAward} className="bg-[#FFB81C] text-[#154734] font-bold py-2 px-4 rounded hover:bg-yellow-400">
+                                        Apply to {bulkSelectedIds.size} Member{bulkSelectedIds.size === 1 ? '' : 's'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-auto">
                             <div className="p-4 border-b bg-gray-50 font-bold text-gray-700 flex justify-between items-center">
@@ -782,7 +881,108 @@ export const Management: React.FC<ManagementProps> = ({
                                         );
                                     }) : (
                                         <tr>
-                                            <td colSpan={5} className="p-8 text-center text-gray-400 italic">No manual point adjustments recorded.</td>
+                                            <td colSpan={6} className="p-8 text-center text-gray-400 italic">No manual point adjustments recorded.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- CLUB EVENTS TAB (tabling signups etc) --- */}
+                {activeTab === 'events' && (
+                    <div className="flex flex-col h-full gap-4 overflow-y-auto">
+                        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm shrink-0">
+                            <h3 className="font-bold text-[#154734] mb-1 flex items-center gap-2">
+                                <CalendarIcon className="w-5 h-5" /> Create Club Event
+                            </h3>
+                            <p className="text-xs text-gray-500 mb-4">
+                                Tabling shifts, etc. Members sign up for an open slot from their portal and get the points automatically.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Title</label>
+                                    <input type="text" className="w-full border p-2 rounded" value={eventForm.title} onChange={e => setEventForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Tabling - Fountain Mall" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Category</label>
+                                    <select className="w-full border p-2 rounded" value={eventForm.category} onChange={e => setEventForm(f => ({ ...f, category: e.target.value }))}>
+                                        {POINT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Location</label>
+                                    <input type="text" className="w-full border p-2 rounded" value={eventForm.location} onChange={e => setEventForm(f => ({ ...f, location: e.target.value }))} placeholder="Optional" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Date</label>
+                                    <input type="date" className="w-full border p-2 rounded" value={eventForm.date} onChange={e => setEventForm(f => ({ ...f, date: e.target.value }))} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Time</label>
+                                    <input type="time" className="w-full border p-2 rounded" value={eventForm.time} onChange={e => setEventForm(f => ({ ...f, time: e.target.value }))} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Slots Open</label>
+                                    <input type="number" min={1} className="w-full border p-2 rounded" value={eventForm.maxSignups} onChange={e => setEventForm(f => ({ ...f, maxSignups: Number(e.target.value) }))} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Points per Signup</label>
+                                    <input type="number" className="w-full border p-2 rounded" value={eventForm.pointsValue} onChange={e => setEventForm(f => ({ ...f, pointsValue: Number(e.target.value) }))} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-bold text-gray-500">Description</label>
+                                    <input type="text" className="w-full border p-2 rounded" value={eventForm.description} onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional details members should see" />
+                                </div>
+                            </div>
+                            <button onClick={handleSubmitEvent} className="mt-4 bg-[#FFB81C] text-[#154734] font-bold py-2 px-4 rounded hover:bg-yellow-400 flex items-center gap-2">
+                                <Plus className="w-4 h-4" /> Create Event
+                            </button>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-auto">
+                            <div className="p-4 border-b bg-gray-50 font-bold text-gray-700 flex items-center gap-2">
+                                <History className="w-4 h-4" /> Upcoming &amp; Past Events
+                            </div>
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-gray-50 text-gray-700 sticky top-0">
+                                    <tr>
+                                        <th className="px-6 py-3">Date</th>
+                                        <th className="px-6 py-3">Event</th>
+                                        <th className="px-6 py-3">Category</th>
+                                        <th className="px-6 py-3 text-center">Slots</th>
+                                        <th className="px-6 py-3 text-center">Signed Up</th>
+                                        <th className="px-6 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {clubEvents.length > 0 ? [...clubEvents].sort((a, b) => a.date.localeCompare(b.date)).map(ev => {
+                                        const taken = eventSignups.filter(s => s.eventId === ev.id).length;
+                                        return (
+                                            <tr key={ev.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 text-gray-500 text-xs">{ev.date}{ev.time ? ` ${ev.time}` : ''}</td>
+                                                <td className="px-6 py-4 font-bold text-gray-900">
+                                                    {ev.title}
+                                                    {ev.location && <div className="text-xs text-gray-400 font-normal flex items-center gap-1"><MapPin className="w-3 h-3" />{ev.location}</div>}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="bg-[#154734]/10 text-[#154734] text-xs font-bold px-2 py-0.5 rounded-full">{ev.category}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center text-gray-500">{ev.maxSignups}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`font-bold ${taken >= ev.maxSignups ? 'text-green-600' : 'text-gray-700'}`}>{taken} / {ev.maxSignups}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button onClick={() => onDeleteClubEvent?.(ev.id)} className="text-gray-400 hover:text-red-500">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }) : (
+                                        <tr>
+                                            <td colSpan={6} className="p-8 text-center text-gray-400 italic">No club events created yet.</td>
                                         </tr>
                                     )}
                                 </tbody>
