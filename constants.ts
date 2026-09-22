@@ -14,6 +14,25 @@ export const VENUES: Venue[] = [
   { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.546944, longitude: -97.116667, radiusMeters: 350 } // widened to cover the whole building footprint plus surrounding roads for meeting check-ins
 ];
 
+// Officer-assigned point categories for things a member can't self-report on
+// the website (hospitality duty, tabling, special projects, referrals, etc).
+// This is the "back-end" side of the points system -- Game Attendance is
+// tracked separately/automatically from check-ins and game location, and
+// doesn't need a category here. Edit this list as the team finalizes their
+// weekly Excel-sheet categories (per the 2026-09-21 leadership call).
+export const POINT_CATEGORIES = [
+  'Hospitality',
+  'Tabling',
+  'Special Project',
+  'Referral',
+  'Other',
+];
+
+// Points needed to advance one "level" within a category, for the member
+// portal's progress bars. Flat for now -- revisit if categories should have
+// different thresholds once the team locks in real point values.
+export const POINTS_PER_LEVEL = 10;
+
 export const AUTHORIZED_USERS = [
   "Ben Jacob",
   "Anna Carrey",

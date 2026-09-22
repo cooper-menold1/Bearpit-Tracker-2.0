@@ -191,7 +191,7 @@ function App() {
             attendance: attendanceMap,
             sports: mappedSports,
             selfieVotes: (selfieVotes || []).map((v: any) => ({ selfieId: v.selfie_id, memberId: v.member_id })),
-            bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date })),
+            bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date, category: b.category || 'Other' })),
             emailTemplate: mappedEmailTemplate
         }));
     };
@@ -472,8 +472,8 @@ function App() {
                 onAddGame={handleAddGame}
                 onDeleteGame={handleDeleteGame}
                 onUpdateProfile={handleUpdateProfile}
-                onAddBonusPoint={async (mid, pts, reason) => {
-                    await supabase.from('bonus_points').insert({ member_id: mid, points: pts, reason, date: new Date().toISOString() });
+                onAddBonusPoint={async (mid, pts, reason, category) => {
+                    await supabase.from('bonus_points').insert({ member_id: mid, points: pts, reason, category: category || 'Other', date: new Date().toISOString() });
                     fetchCoreData();
                 }}
                 onDeleteBonusPoint={async (id) => {

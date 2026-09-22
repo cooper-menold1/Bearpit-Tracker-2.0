@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Member, Game, Role, Sport, BonusPoint } from '../types';
+import { POINT_CATEGORIES } from '../constants';
 import { parseOutlookCSV } from '../utils/importUtils';
 import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet } from 'lucide-react';
 import { buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
@@ -63,7 +64,7 @@ interface ManagementProps {
     onAddGame: (g: Game) => void;
     onDeleteGame: (id: string) => void;
     onUpdateProfile: (updates: Partial<Member>) => void;
-    onAddBonusPoint: (memberId: string, points: number, reason: string) => void;
+    onAddBonusPoint: (memberId: string, points: number, reason: string, category?: string) => void;
     onDeleteBonusPoint: (id: string) => void;
     onAddSport?: (name: string) => Promise<string>;
     userRole?: Role;
@@ -158,6 +159,7 @@ export const Management: React.FC<ManagementProps> = ({
     const [selectedMemberId, setSelectedMemberId] = useState<string>('');
     const [manualPoints, setManualPoints] = useState<number>(0);
     const [pointsReason, setPointsReason] = useState<string>('');
+    const [pointsCategory, setPointsCategory] = useState<string>(POINT_CATEGORIES[0]);
 
 
     // Modal States
@@ -311,7 +313,7 @@ export const Management: React.FC<ManagementProps> = ({
             alert("Please fill in all fields.");
             return;
         }
-        onAddBonusPoint(selectedMemberId, manualPoints, pointsReason);
+        onAddBonusPoint(selectedMemberId, manualPoints, pointsReason, pointsCategory);
         setManualPoints(0);
         setPointsReason('');
     };
@@ -681,7 +683,7 @@ export const Management: React.FC<ManagementProps> = ({
                             <h3 className="font-bold text-[#154734] mb-4 flex items-center gap-2">
                                 <Trophy className="w-5 h-5" /> Adjust Member Points
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                                 <div>
                                     <label className="text-xs font-bold text-gray-500">Member</label>
                                     <select
@@ -692,6 +694,18 @@ export const Management: React.FC<ManagementProps> = ({
                                         <option value="">Select Member...</option>
                                         {members.sort((a, b) => a.firstName.localeCompare(b.firstName)).map(m => (
                                             <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500">Category</label>
+                                    <select
+                                        className="w-full border p-2 rounded"
+                                        value={pointsCategory}
+                                        onChange={e => setPointsCategory(e.target.value)}
+                                    >
+                                        {POINT_CATEGORIES.map(c => (
+                                            <option key={c} value={c}>{c}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -733,6 +747,7 @@ export const Management: React.FC<ManagementProps> = ({
                                     <tr>
                                         <th className="px-6 py-3">Date</th>
                                         <th className="px-6 py-3">Member</th>
+                                        <th className="px-6 py-3">Category</th>
                                         <th className="px-6 py-3">Reason</th>
                                         <th className="px-6 py-3 text-right">Points</th>
                                         <th className="px-6 py-3 text-right">Action</th>
@@ -748,6 +763,11 @@ export const Management: React.FC<ManagementProps> = ({
                                                 </td>
                                                 <td className="px-6 py-4 font-bold text-gray-900">
                                                     {m ? `${m.firstName} ${m.lastName}` : 'Unknown'}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="bg-[#154734]/10 text-[#154734] text-xs font-bold px-2 py-0.5 rounded-full">
+                                                        {bp.category || 'Other'}
+                                                    </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-gray-600">{bp.reason}</td>
                                                 <td className={`px-6 py-4 text-right font-bold ${bp.points > 0 ? 'text-green-600' : 'text-red-500'}`}>
