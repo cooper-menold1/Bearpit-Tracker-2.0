@@ -30,7 +30,7 @@ export interface BonusPoint {
     points: number;
     reason: string;
     date: string;
-    category?: string; // e.g. 'Hospitality', 'Tabling' -- things a member can't self-report, logged by officers from the weekly Excel sheet. See constants.ts POINT_CATEGORIES.
+    category?: string; // e.g. 'Hospitality', 'Marketing' -- things a member can't self-report, logged by officers from the weekly Excel sheet. See constants.ts POINT_CATEGORIES.
 }
 
 export interface SelfieVote {

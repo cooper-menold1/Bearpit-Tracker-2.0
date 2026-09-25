@@ -8,7 +8,7 @@ import { Management } from './Management';
 import { Leaderboard } from './Leaderboard';
 import { SelfieContest } from './SelfieContest';
 import { Heart } from 'lucide-react';
-import { POINT_CATEGORIES, POINTS_PER_LEVEL } from '../constants';
+import { POINT_CATEGORIES, FAN_TIERS } from '../constants';
 
 interface MemberPortalProps {
     member: Member;
@@ -61,21 +61,29 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 points: myBonusPoints.filter(b => (b.category || 'Other') === name).reduce((sum, b) => sum + b.points, 0),
                 icon: 'category' as const,
             })),
-        ].map(cat => {
-            const points = Math.max(0, cat.points); // negative adjustments shouldn't show a "negative progress" bar
-            const level = Math.floor(points / POINTS_PER_LEVEL);
-            const intoLevel = points % POINTS_PER_LEVEL;
-            return {
-                ...cat,
-                points: cat.points,
-                level,
-                progressPct: Math.round((intoLevel / POINTS_PER_LEVEL) * 100),
-                pointsToNextLevel: POINTS_PER_LEVEL - intoLevel,
-            };
-        });
+        ];
 
         const totalPoints = categories.reduce((sum, c) => sum + c.points, 0)
             + (member.role === Role.ADMIN || member.role === Role.OFFICER ? 5 : 0);
+
+        // Fan tier: highest tier where the member meets BOTH the points and
+        // the breadth (distinct categories) requirement. 'Other' is excluded
+        // from breadth so misc adjustments can't unlock a tier.
+        const categoriesEarned = categories.filter(c => c.name !== 'Other' && c.points > 0).length;
+        let tierIndex = 0;
+        FAN_TIERS.forEach((t, i) => {
+            if (totalPoints >= t.minPoints && categoriesEarned >= t.minCategories) tierIndex = i;
+        });
+        const nextTier = FAN_TIERS[tierIndex + 1];
+        const tier = {
+            name: FAN_TIERS[tierIndex].name,
+            next: nextTier ? {
+                name: nextTier.name,
+                pointsNeeded: Math.max(0, nextTier.minPoints - totalPoints),
+                categoriesNeeded: Math.max(0, nextTier.minCategories - categoriesEarned),
+                progressPct: Math.min(100, Math.round((Math.max(0, totalPoints) / nextTier.minPoints) * 100)),
+            } : null,
+        };
 
         // Recent activity feed: combine game check-ins + manual bonus point
         // entries into one "where are my points coming from" timeline.
@@ -99,7 +107,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
         }));
         const activity = [...gameHistory, ...bonusHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        return { totalPoints, categories, activity };
+        return { totalPoints, categories, categoriesEarned, tier, activity };
     }, [data, member.id, member.role]);
 
     const handleDayClick = (date: Date) => {
@@ -224,34 +232,56 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                     <span className="text-4xl font-bold">{stats.totalPoints}</span>
                                 </div>
                             </div>
-                            <Trophy className="w-12 h-12 text-[#FFB81C]/40" />
+                            <div className="text-right">
+                                <p className="text-[#FFB81C] text-sm font-bold uppercase tracking-wide">Fan Level</p>
+                                <p className="mt-1 text-2xl font-extrabold">{stats.tier.name}</p>
+                            </div>
                         </div>
 
-                        {/* Category Breakdown -- "here's the category you're getting
-                            points in, here's what you need for the next level" */}
+                        {/* Progress to the next fan tier: points AND breadth */}
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            {stats.tier.next ? (
+                                <>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-bold text-gray-800">Next level: {stats.tier.next.name}</span>
+                                        <span className="text-xs text-gray-500">{stats.totalPoints} / {FAN_TIERS.find(t => t.name === stats.tier.next!.name)!.minPoints} pts</span>
+                                    </div>
+                                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-[#154734] rounded-full transition-all" style={{ width: `${stats.tier.next.progressPct}%` }}></div>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mt-3">
+                                        {stats.tier.next.pointsNeeded > 0 && <>{stats.tier.next.pointsNeeded} more pts</>}
+                                        {stats.tier.next.pointsNeeded > 0 && stats.tier.next.categoriesNeeded > 0 && ' and '}
+                                        {stats.tier.next.categoriesNeeded > 0 && <>points in {stats.tier.next.categoriesNeeded} more categor{stats.tier.next.categoriesNeeded === 1 ? 'y' : 'ies'}</>}
+                                        {' '}to reach {stats.tier.next.name}.
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="font-bold text-[#154734]">You've reached the top level. Sic 'em!</p>
+                            )}
+                            <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-2">
+                                {FAN_TIERS.map(t => (
+                                    <div key={t.name} className={`rounded-lg p-2 text-center border ${t.name === stats.tier.name ? 'border-[#154734] bg-[#154734]/5' : 'border-gray-100'}`}>
+                                        <p className="text-xs font-bold text-gray-800">{t.name}</p>
+                                        <p className="text-[10px] text-gray-500">{t.minPoints === 0 ? 'Starting level' : `${t.minPoints}+ pts, ${t.minCategories} categories`}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Category Breakdown -- "here's the category you're getting points in" */}
                         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                             <p className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-4 flex items-center gap-2">
-                                <Sparkles className="w-4 h-4" /> Points by Category
+                                <Sparkles className="w-4 h-4" /> Points by Category ({stats.categoriesEarned} earned)
                             </p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {stats.categories.map(cat => (
-                                    <div key={cat.name} className="border border-gray-100 rounded-lg p-4">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="font-bold text-gray-800">{cat.name}</span>
-                                            <span className="text-xs font-bold bg-[#FFB81C]/20 text-yellow-800 px-2 py-0.5 rounded-full">
-                                                Level {cat.level}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-baseline gap-1 mb-2">
-                                            <span className="text-2xl font-bold text-[#154734]">{cat.points}</span>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {stats.categories.filter(cat => cat.name !== 'Other' || cat.points !== 0).map(cat => (
+                                    <div key={cat.name} className={`border rounded-lg p-3 ${cat.points > 0 ? 'border-[#154734]/30' : 'border-gray-100'}`}>
+                                        <span className="font-bold text-gray-800 text-sm">{cat.name}</span>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className={`text-2xl font-bold ${cat.points > 0 ? 'text-[#154734]' : 'text-gray-300'}`}>{cat.points}</span>
                                             <span className="text-gray-400 text-xs">pts</span>
                                         </div>
-                                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-[#154734] rounded-full transition-all" style={{ width: `${cat.progressPct}%` }}></div>
-                                        </div>
-                                        <p className="text-[10px] text-gray-400 mt-1">
-                                            {cat.points >= 0 ? `${cat.pointsToNextLevel} pts to Level ${cat.level + 1}` : 'No points yet in this category'}
-                                        </p>
                                     </div>
                                 ))}
                             </div>

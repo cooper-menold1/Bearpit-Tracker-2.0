@@ -4,6 +4,7 @@ import { Member, Selfie, Role } from '../types';
 import { Music, QrCode, User, UserPlus, X } from 'lucide-react';
 import LOGO_V2 from '../assets/bearpit_logo_full_color.png';
 import { supabase } from '../utils/supabaseClient';
+import { NEXT_INTEREST_MEETING } from '../constants';
 
 const CONFETTI_EMOJI = ['🏀', '🏈', '⚾', '🏐', '🎾', '⚽'];
 
@@ -123,22 +124,6 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
             <div className="relative z-10 bg-gray-50 flex flex-col items-center w-full shadow-[0_-20px_50px_rgba(0,0,0,0.3)]">
                 <div className="w-full max-w-7xl mx-auto px-4 py-12">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <button onClick={onChants} className="bg-[#154734] group relative overflow-hidden rounded-3xl shadow-2xl hover:shadow-[0_20px_60px_rgba(21,71,52,0.4)] transition-all duration-300 transform hover:-translate-y-2 border border-[#FFB81C]/20 flex flex-col h-[600px]">
-                            <div className="absolute -right-12 -bottom-12 text-[#FFB81C] opacity-10 group-hover:opacity-20 transition-opacity duration-500 transform group-hover:rotate-12">
-                                <Music className="w-80 h-80" />
-                            </div>
-                            <div className="absolute top-0 left-0 w-2 h-full bg-[#FFB81C] group-hover:w-4 transition-all duration-300" />
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 text-center space-y-8">
-                                <div className="bg-[#FFB81C] p-8 rounded-full text-[#154734] shadow-lg group-hover:scale-110 transition-transform duration-300">
-                                    <Music className="w-16 h-16" />
-                                </div>
-                                <div>
-                                    <h3 className="text-4xl font-extrabold text-[#FFB81C] mb-4 tracking-tight">Gameday<br />Chants</h3>
-                                    <p className="text-white/80 font-medium text-lg leading-relaxed">View lyrics and leading guides for today's game.</p>
-                                </div>
-                            </div>
-                        </button>
-
                         <button onClick={onInterest} className="bg-[#154734] group relative overflow-hidden rounded-3xl shadow-2xl hover:shadow-[0_20px_60px_rgba(21,71,52,0.4)] transition-all duration-300 transform hover:-translate-y-2 border border-[#FFB81C]/20 flex flex-col h-[600px]">
                             <div className="absolute -right-12 -top-12 text-[#FFB81C] opacity-10 group-hover:opacity-20 transition-opacity duration-500 transform group-hover:-rotate-12">
                                 <UserPlus className="w-80 h-80" />
@@ -151,6 +136,11 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                 <div>
                                     <h3 className="text-4xl font-extrabold text-[#FFB81C] mb-4 tracking-tight">Interested in<br />Joining?</h3>
                                     <p className="text-white/80 font-medium text-lg leading-relaxed">Tell us a bit about yourself and we'll be in touch.</p>
+                                    {NEXT_INTEREST_MEETING && (
+                                        <p className="mt-6 inline-block bg-[#FFB81C]/15 text-[#FFB81C] font-bold text-sm uppercase tracking-wider px-4 py-2 rounded-full">
+                                            Next interest meeting: {NEXT_INTEREST_MEETING}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </button>
@@ -167,6 +157,22 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                 <div>
                                     <h3 className="text-4xl font-extrabold text-[#FFB81C] mb-4 tracking-tight">Attendance<br />Login</h3>
                                     <p className="text-white/80 font-medium text-lg leading-relaxed">For BearPit Leadership Members Only.</p>
+                                </div>
+                            </div>
+                        </button>
+
+                        <button onClick={onChants} className="bg-[#154734] group relative overflow-hidden rounded-3xl shadow-2xl hover:shadow-[0_20px_60px_rgba(21,71,52,0.4)] transition-all duration-300 transform hover:-translate-y-2 border border-[#FFB81C]/20 flex flex-col h-[600px]">
+                            <div className="absolute -right-12 -bottom-12 text-[#FFB81C] opacity-10 group-hover:opacity-20 transition-opacity duration-500 transform group-hover:rotate-12">
+                                <Music className="w-80 h-80" />
+                            </div>
+                            <div className="absolute top-0 left-0 w-2 h-full bg-[#FFB81C] group-hover:w-4 transition-all duration-300" />
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 text-center space-y-8">
+                                <div className="bg-[#FFB81C] p-8 rounded-full text-[#154734] shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                    <Music className="w-16 h-16" />
+                                </div>
+                                <div>
+                                    <h3 className="text-4xl font-extrabold text-[#FFB81C] mb-4 tracking-tight">Gameday<br />Chants</h3>
+                                    <p className="text-white/80 font-medium text-lg leading-relaxed">View lyrics and leading guides for today's game.</p>
                                 </div>
                             </div>
                         </button>

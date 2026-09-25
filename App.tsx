@@ -200,7 +200,7 @@ function App() {
             selfieVotes: (selfieVotes || []).map((v: any) => ({ selfieId: v.selfie_id, memberId: v.member_id })),
             bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date, category: b.category || 'Other' })),
             clubEvents: (clubEvents || []).map((e: any) => ({
-                id: e.id, title: e.title, category: e.category || 'Tabling', date: e.date, time: e.time,
+                id: e.id, title: e.title, category: e.category || 'Marketing', date: e.date, time: e.time,
                 location: e.location, maxSignups: e.max_signups ?? 2, pointsValue: e.points_value ?? 1, description: e.description
             })),
             eventSignups: (eventSignups || []).map((s: any) => ({ id: s.id, eventId: s.event_id, memberId: s.member_id, bonusPointId: s.bonus_point_id, timestamp: s.timestamp })),
@@ -461,10 +461,20 @@ function App() {
         fetchCoreData();
     };
 
+    // Point/signup writes used to fire without checking the result, so a
+    // failed save (bad connection, RLS) looked like success and the member
+    // silently never got their points. Surface it instead.
+    const pointsWriteFailed = (action: string, error: { message: string } | null) => {
+        if (!error) return false;
+        console.error(`${action} failed:`, error);
+        alert(`${action} didn't save: ${error.message}. Nothing was changed, please try again.`);
+        return true;
+    };
+
     // --- Club Events (tabling signups etc) ---
 
     const handleAddClubEvent = async (event: Omit<ClubEvent, 'id'>) => {
-        await supabase.from('club_events').insert({
+        const { error } = await supabase.from('club_events').insert({
             title: event.title,
             category: event.category,
             date: event.date,
@@ -474,12 +484,14 @@ function App() {
             points_value: event.pointsValue,
             description: event.description || null,
         });
+        if (pointsWriteFailed('Creating the event', error)) return;
         await fetchCoreData();
     };
 
     const handleDeleteClubEvent = async (id: string) => {
         if (window.confirm("Delete this event? Any existing signups (and the points they awarded) will be removed too.")) {
-            await supabase.from('club_events').delete().eq('id', id);
+            const { error } = await supabase.from('club_events').delete().eq('id', id);
+            pointsWriteFailed('Deleting the event', error);
             await fetchCoreData();
         }
     };
@@ -497,18 +509,24 @@ function App() {
             alert("This event is already full.");
             return;
         }
-        const { data: bp } = await supabase.from('bonus_points').insert({
+        const { data: bp, error: bpError } = await supabase.from('bonus_points').insert({
             member_id: memberId,
             points: event.pointsValue,
             reason: event.title,
             category: event.category,
             date: new Date().toISOString(),
         }).select('id').single();
-        await supabase.from('event_signups').insert({
+        if (pointsWriteFailed('Signing up', bpError)) return;
+        const { error: signupError } = await supabase.from('event_signups').insert({
             event_id: eventId,
             member_id: memberId,
-            bonus_point_id: bp?.id ?? null,
+            bonus_point_id: bp.id,
         });
+        if (signupError) {
+            // Don't leave points behind for a slot that was never claimed.
+            await supabase.from('bonus_points').delete().eq('id', bp.id);
+            pointsWriteFailed('Signing up', signupError);
+        }
         await fetchCoreData();
     };
 
@@ -517,8 +535,12 @@ function App() {
     const handleCancelSignup = async (signupId: string) => {
         const signup = data.eventSignups.find(s => s.id === signupId);
         if (!signup) return;
-        await supabase.from('event_signups').delete().eq('id', signupId);
-        if (signup.bonusPointId) await supabase.from('bonus_points').delete().eq('id', signup.bonusPointId);
+        const { error } = await supabase.from('event_signups').delete().eq('id', signupId);
+        if (pointsWriteFailed('Cancelling the signup', error)) return;
+        if (signup.bonusPointId) {
+            const { error: bpError } = await supabase.from('bonus_points').delete().eq('id', signup.bonusPointId);
+            pointsWriteFailed('Removing the signup points', bpError);
+        }
         await fetchCoreData();
     };
 
@@ -530,7 +552,8 @@ function App() {
         const rows = memberIds.map(memberId => ({
             member_id: memberId, points, reason, category, date: new Date().toISOString(),
         }));
-        await supabase.from('bonus_points').insert(rows);
+        const { error } = await supabase.from('bonus_points').insert(rows);
+        pointsWriteFailed('Bulk award', error);
         await fetchCoreData();
     };
 
@@ -561,11 +584,13 @@ function App() {
                 onDeleteGame={handleDeleteGame}
                 onUpdateProfile={handleUpdateProfile}
                 onAddBonusPoint={async (mid, pts, reason, category) => {
-                    await supabase.from('bonus_points').insert({ member_id: mid, points: pts, reason, category: category || 'Other', date: new Date().toISOString() });
+                    const { error } = await supabase.from('bonus_points').insert({ member_id: mid, points: pts, reason, category: category || 'Other', date: new Date().toISOString() });
+                    pointsWriteFailed('Awarding points', error);
                     fetchCoreData();
                 }}
                 onDeleteBonusPoint={async (id) => {
-                    await supabase.from('bonus_points').delete().eq('id', id);
+                    const { error } = await supabase.from('bonus_points').delete().eq('id', id);
+                    pointsWriteFailed('Deleting points', error);
                     fetchCoreData();
                 }}
                 onBulkAwardPoints={handleBulkAwardPoints}

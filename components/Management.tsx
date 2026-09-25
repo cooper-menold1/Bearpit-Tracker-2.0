@@ -4,6 +4,7 @@ import { POINT_CATEGORIES } from '../constants';
 import { parseOutlookCSV } from '../utils/importUtils';
 import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet } from 'lucide-react';
 import { buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
+import { matchSignups } from '../utils/signupImport';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
@@ -186,12 +187,28 @@ export const Management: React.FC<ManagementProps> = ({
             return next;
         });
     };
+    // Sign-up sheet import: pre-checks everyone on an exported Box/Excel
+    // sheet so the officer only has to pick category/points/reason.
+    const [importUnmatched, setImportUnmatched] = useState<string[] | null>(null);
+    const handleImportSignupSheet = async (file: File) => {
+        const { matched, unmatched } = matchSignups(await file.text(), members);
+        setBulkSelectedIds(new Set(matched.map(m => m.id)));
+        setImportUnmatched(unmatched);
+    };
+    // Members already credited for this exact reason -- guards against
+    // importing the same sheet twice.
+    const bulkAlreadyAwarded = bulkReason.trim()
+        ? members.filter(m => bulkSelectedIds.has(m.id) && bonusPoints.some(b => b.memberId === m.id && b.reason.trim().toLowerCase() === bulkReason.trim().toLowerCase()))
+        : [];
+
     const handleSubmitBulkAward = () => {
         if (bulkSelectedIds.size === 0 || bulkPoints === 0 || !bulkReason || !onBulkAwardPoints) {
             alert("Select at least one member, a reason, and non-zero points.");
             return;
         }
-        onBulkAwardPoints(Array.from(bulkSelectedIds), bulkPoints, bulkReason, bulkCategory);
+        const skip = new Set(bulkAlreadyAwarded.map(m => m.id));
+        onBulkAwardPoints(Array.from(bulkSelectedIds).filter(id => !skip.has(id)), bulkPoints, bulkReason, bulkCategory);
+        setImportUnmatched(null);
         setBulkSelectedIds(new Set());
         setBulkPoints(1);
         setBulkReason('');
@@ -199,7 +216,7 @@ export const Management: React.FC<ManagementProps> = ({
 
     // Club Events (tabling signups) State
     const [eventForm, setEventForm] = useState({
-        title: '', category: POINT_CATEGORIES.includes('Tabling') ? 'Tabling' : POINT_CATEGORIES[0],
+        title: '', category: 'Marketing',
         date: '', time: '', location: '', maxSignups: 2, pointsValue: 1, description: ''
     });
     const handleSubmitEvent = () => {
@@ -807,6 +824,24 @@ export const Management: React.FC<ManagementProps> = ({
                                 <p className="text-xs text-gray-500 mb-4">
                                     For things members can't self-report and you notice as a group — e.g. everyone on hospitality duty at Saturday's game.
                                 </p>
+                                <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+                                    <label className="font-bold text-[#154734] cursor-pointer hover:underline">
+                                        Import sign-up sheet (.csv) →
+                                        <input type="file" accept=".csv,text/csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImportSignupSheet(f); e.target.value = ''; }} />
+                                    </label>
+                                    <span className="text-xs text-gray-400">From Box/Excel: File → Save As / Download as CSV. Matches on email, then full name.</span>
+                                </div>
+                                {importUnmatched && (
+                                    <div className={`mb-3 text-xs rounded-lg p-3 ${importUnmatched.length ? 'bg-yellow-50 text-yellow-900 border border-yellow-200' : 'bg-green-50 text-green-800 border border-green-200'}`}>
+                                        Checked {bulkSelectedIds.size} member{bulkSelectedIds.size === 1 ? '' : 's'} from the sheet.
+                                        {importUnmatched.length > 0 && <> Not matched to any member (check spelling, or add them first): <b>{importUnmatched.join(', ')}</b></>}
+                                    </div>
+                                )}
+                                {bulkAlreadyAwarded.length > 0 && (
+                                    <div className="mb-3 text-xs rounded-lg p-3 bg-blue-50 text-blue-900 border border-blue-200">
+                                        Already credited for "{bulkReason.trim()}", will be skipped: <b>{bulkAlreadyAwarded.map(m => `${m.firstName} ${m.lastName}`).join(', ')}</b>
+                                    </div>
+                                )}
                                 <div className="max-h-40 overflow-y-auto border rounded-lg p-2 mb-4 grid grid-cols-2 md:grid-cols-3 gap-1">
                                     {members.sort((a, b) => a.firstName.localeCompare(b.firstName)).map(m => (
                                         <label key={m.id} className="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
@@ -831,7 +866,7 @@ export const Management: React.FC<ManagementProps> = ({
                                         <input type="text" className="w-full border p-2 rounded" value={bulkReason} onChange={e => setBulkReason(e.target.value)} placeholder="e.g. Hospitality duty at BSB game" />
                                     </div>
                                     <button onClick={handleSubmitBulkAward} className="bg-[#FFB81C] text-[#154734] font-bold py-2 px-4 rounded hover:bg-yellow-400">
-                                        Apply to {bulkSelectedIds.size} Member{bulkSelectedIds.size === 1 ? '' : 's'}
+                                        Apply to {bulkSelectedIds.size - bulkAlreadyAwarded.length} Member{bulkSelectedIds.size - bulkAlreadyAwarded.length === 1 ? '' : 's'}
                                     </button>
                                 </div>
                             </div>

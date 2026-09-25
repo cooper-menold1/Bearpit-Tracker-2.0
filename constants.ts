@@ -14,24 +14,36 @@ export const VENUES: Venue[] = [
   { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.546944, longitude: -97.116667, radiusMeters: 350 } // widened to cover the whole building footprint plus surrounding roads for meeting check-ins
 ];
 
-// Officer-assigned point categories for things a member can't self-report on
-// the website (hospitality duty, tabling, special projects, referrals, etc).
-// This is the "back-end" side of the points system -- Game Attendance is
-// tracked separately/automatically from check-ins and game location, and
-// doesn't need a category here. Edit this list as the team finalizes their
-// weekly Excel-sheet categories (per the 2026-09-21 leadership call).
+// Officer-assigned point categories, from the points menu presented at the
+// 2026-09-14 leadership meeting. Game Attendance is tracked separately and
+// automatically from check-ins, so it isn't listed here. 'Other' stays last
+// for legacy rows and one-off adjustments.
 export const POINT_CATEGORIES = [
   'Hospitality',
-  'Tabling',
-  'Special Project',
-  'Referral',
+  'Game Day',
+  'Recruitment',
+  'Marketing',
+  'Media',
+  'Community',
+  'Leadership',
   'Other',
 ];
 
-// Points needed to advance one "level" within a category, for the member
-// portal's progress bars. Flat for now -- revisit if categories should have
-// different thresholds once the team locks in real point values.
-export const POINTS_PER_LEVEL = 10;
+// Fan levels, lowest first. Tier names are from the 2026-09-14 meeting
+// (Rookie, Starter, Captain, BPLT All-Star). Point + category thresholds
+// follow the Fall 2026 Point Incentive Framework benchmarks (20/2, 40/3,
+// 60/4). A member needs BOTH the points and the number of different
+// categories to reach a tier ("no point farming" breadth rule).
+// Game Attendance counts as a category; 'Other' does not.
+export const FAN_TIERS = [
+  { name: 'Rookie', minPoints: 0, minCategories: 0 },
+  { name: 'Starter', minPoints: 20, minCategories: 2 },
+  { name: 'Captain', minPoints: 40, minCategories: 3 },
+  { name: 'BPLT All-Star', minPoints: 60, minCategories: 4 },
+];
+
+// Shown on the landing page's "Interested in Joining?" card. Set to '' to hide.
+export const NEXT_INTEREST_MEETING = 'Monday, Oct. 5';
 
 export const AUTHORIZED_USERS = [
   "Ben Jacob",
