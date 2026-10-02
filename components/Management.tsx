@@ -8,6 +8,7 @@ import { matchSignups } from '../utils/signupImport';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
+import { BugLog } from './BugLog';
 
 // Inline helper to avoid import issues
 const convertInputToCST = (dateStr: string, timeStr: string, sourceTimeZone: string): { date: string, time: string } => {
@@ -96,7 +97,7 @@ export const Management: React.FC<ManagementProps> = ({
     onAddSport,
     userRole
 }) => {
-    const [activeTab, setActiveTab] = useState<'members' | 'games' | 'points' | 'events'>('games');
+    const [activeTab, setActiveTab] = useState<'members' | 'games' | 'points' | 'events' | 'bugs'>('games');
     const [selectedProfileMember, setSelectedProfileMember] = useState<Member | null>(null);
     const [showAutoFill, setShowAutoFill] = useState(false);
 
@@ -415,6 +416,12 @@ export const Management: React.FC<ManagementProps> = ({
                     className={`pb-2 px-4 font-medium transition-colors whitespace-nowrap ${activeTab === 'events' ? 'text-[#154734] border-b-2 border-[#154734]' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                     Club Events
+                </button>
+                <button
+                    onClick={() => { setActiveTab('bugs'); resetGameForm(); }}
+                    className={`pb-2 px-4 font-medium transition-colors whitespace-nowrap ${activeTab === 'bugs' ? 'text-[#154734] border-b-2 border-[#154734]' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    Bug Log
                 </button>
             </div>
 
@@ -1025,6 +1032,9 @@ export const Management: React.FC<ManagementProps> = ({
                         </div>
                     </div>
                 )}
+
+                {/* --- BUG LOG TAB --- */}
+                {activeTab === 'bugs' && <BugLog />}
             </div>
 
             {selectedProfileMember && (
