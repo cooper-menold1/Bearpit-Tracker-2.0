@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Member, Game, Role, Sport, BonusPoint, ClubEvent, EventSignup } from '../types';
 import { POINT_CATEGORIES } from '../constants';
 import { parseOutlookCSV } from '../utils/importUtils';
-import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet, Search } from 'lucide-react';
 import { buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
 import { matchSignups } from '../utils/signupImport';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
 import { BugLog } from './BugLog';
+import { gamePointValue } from '../utils/fanTier';
 
 // Inline helper to avoid import issues
 const convertInputToCST = (dateStr: string, timeStr: string, sourceTimeZone: string): { date: string, time: string } => {
@@ -65,7 +66,7 @@ interface ManagementProps {
     onDeleteMember: (id: string) => void;
     onAddGame: (g: Game) => void;
     onDeleteGame: (id: string) => void;
-    onUpdateProfile: (updates: Partial<Member>) => void;
+    onUpdateProfile: (updates: Partial<Member>, memberId?: string, actingPassword?: string) => Promise<string | null | void> | void;
     onAddBonusPoint: (memberId: string, points: number, reason: string, category?: string) => void;
     onDeleteBonusPoint: (id: string) => void;
     onBulkAwardPoints?: (memberIds: string[], points: number, reason: string, category: string) => void;
@@ -149,6 +150,16 @@ export const Management: React.FC<ManagementProps> = ({
 
     // Editing State
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [memberSearch, setMemberSearch] = useState('');
+    const filteredMembers = (() => {
+        const q = memberSearch.trim().toLowerCase();
+        if (!q) return members;
+        return members.filter(m =>
+            `${m.firstName} ${m.lastName}`.toLowerCase().includes(q)
+            || (m.email || '').toLowerCase().includes(q)
+            || m.role.toLowerCase().includes(q)
+        );
+    })();
 
     // New/Edit Member State
     const [memberForm, setMemberForm] = useState<Partial<Member>>({
@@ -340,7 +351,7 @@ export const Management: React.FC<ManagementProps> = ({
                 opponent: gameForm.opponent,
                 location: gameForm.location as any,
                 isBonus: gameForm.isBonus,
-                pointsValue: Number(gameForm.pointsValue),
+                pointsValue: 1, // unused: game points come from gamePointValue()
                 description: gameForm.description
             };
 
@@ -586,17 +597,9 @@ export const Management: React.FC<ManagementProps> = ({
                                             </div>
                                         </div>
 
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Points Value</label>
-                                            <input
-                                                type="number"
-                                                value={gameForm.pointsValue}
-                                                onChange={e => setGameForm({ ...gameForm, pointsValue: Number(e.target.value) })}
-                                                className="w-full border p-2 rounded focus:ring-2 focus:ring-[#154734] outline-none"
-                                                min="0"
-                                            />
-                                            <p className="text-[10px] text-gray-400 mt-1">Standard game is 1 point.</p>
-                                        </div>
+                                        <p className="text-xs text-gray-500">
+                                            Worth {gamePointValue({ isBonus: gameForm.isBonus })} point{gameForm.isBonus ? 's' : ''}. Every game is 1 point, bonus games are 2.
+                                        </p>
 
                                         <textarea placeholder="Notes / Description" value={gameForm.description} onChange={e => setGameForm({ ...gameForm, description: e.target.value })} className="w-full border p-2 rounded text-sm h-20 focus:ring-2 focus:ring-[#154734] outline-none"></textarea>
 
@@ -614,8 +617,30 @@ export const Management: React.FC<ManagementProps> = ({
                 {/* --- MEMBERS TAB --- */}
                 {activeTab === 'members' && (
                     <div className="flex flex-col h-full gap-4">
-                        <div className={`p-4 rounded-lg border flex flex-wrap gap-3 items-end shrink-0 transition-colors ${editingId ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200'}`}>
-                            {/* Simplified output for Member Form */}
+                        {/* Members are no longer added here (they come in through the interest form);
+                            this form only appears while editing an existing member via the pencil. */}
+                        <div className="relative shrink-0">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                value={memberSearch}
+                                onChange={e => setMemberSearch(e.target.value)}
+                                placeholder="Search members by name, email, or role..."
+                                className="w-full border border-gray-300 rounded-lg pl-9 pr-9 py-2.5 text-sm focus:ring-2 focus:ring-[#154734] outline-none"
+                            />
+                            {memberSearch && (
+                                <button onClick={() => setMemberSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="Clear search">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        {memberSearch && (
+                            <p className="text-xs text-gray-500 -mt-2 shrink-0">Showing {filteredMembers.length} of {members.length} members</p>
+                        )}
+
+                        {editingId && (
+                        <div className="p-4 rounded-lg border flex flex-wrap gap-3 items-end shrink-0 bg-yellow-50 border-yellow-200">
+                            <span className="text-xs font-bold text-yellow-800 w-full">Editing member</span>
                             <input type="text" value={memberForm.firstName} onChange={e => setMemberForm({ ...memberForm, firstName: e.target.value })} placeholder="First" className="border p-2 rounded text-sm w-32" />
                             <input type="text" value={memberForm.lastName} onChange={e => setMemberForm({ ...memberForm, lastName: e.target.value })} placeholder="Last" className="border p-2 rounded text-sm w-32" />
                             <select value={memberForm.role} onChange={e => setMemberForm({ ...memberForm, role: e.target.value as Role })} className="border p-2 rounded text-sm">
@@ -626,8 +651,9 @@ export const Management: React.FC<ManagementProps> = ({
                                 <option value={Role.INACTIVE}>Inactive</option>
                             </select>
                             <button onClick={handleSaveMember} className="bg-[#154734] text-white px-4 py-2 rounded text-sm font-bold">Save</button>
-                            {editingId && <button onClick={resetMemberForm} className="bg-gray-200 px-3 py-2 rounded"><X className="w-4 h-4" /></button>}
+                            <button onClick={resetMemberForm} className="bg-gray-200 px-3 py-2 rounded"><X className="w-4 h-4" /></button>
                         </div>
+                        )}
 
                         <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -727,7 +753,12 @@ export const Management: React.FC<ManagementProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {members.map(m => (
+                                    {filteredMembers.length === 0 && (
+                                        <tr>
+                                            <td colSpan={showEmailCompose ? 4 : 3} className="p-8 text-center text-gray-400 italic">No members match "{memberSearch}".</td>
+                                        </tr>
+                                    )}
+                                    {filteredMembers.map(m => (
                                         <tr key={m.id} className="hover:bg-gray-50">
                                             {showEmailCompose && (
                                                 <td className="px-4 py-3">

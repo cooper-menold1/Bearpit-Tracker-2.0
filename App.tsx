@@ -267,19 +267,21 @@ function App() {
         window.history.replaceState({}, '', window.location.pathname);
     };
 
-    const handleUpdateProfile = async (updates: Partial<Member>, memberId?: string) => {
+    // Returns an error message, or null on success (SettingsModal shows it).
+    const handleUpdateProfile = async (updates: Partial<Member>, memberId?: string, actingPasswordOverride?: string): Promise<string | null> => {
         const idToUpdate = memberId || currentMember?.id;
-        if (!idToUpdate) return;
+        if (!idToUpdate) return 'No member selected.';
 
         try {
             // Password changes go through server-side RPCs -- the client
             // never writes to the password column directly (it can't; see
             // the column-level REVOKE in update_schema_v4_secure_login.sql).
             if (updates.password) {
-                const actingPassword = currentPasswordRef.current;
+                // Prefer the password typed into the modal: the login-time copy in
+                // currentPasswordRef is lost whenever the page is refreshed.
+                const actingPassword = actingPasswordOverride || currentPasswordRef.current;
                 if (!actingPassword || !currentMember) {
-                    alert('Please log out and back in before changing a password.');
-                    return;
+                    return 'Please log out and back in before changing a password.';
                 }
 
                 const isSelf = idToUpdate === currentMember.id;
@@ -297,8 +299,9 @@ function App() {
                     });
 
                 if (rpcError || !ok) {
-                    alert('Could not update password -- your own password may be out of date. Try logging out and back in.');
-                    return;
+                    return isSelf
+                        ? 'Password not changed: your current password was incorrect.'
+                        : 'Password not reset: your admin password was incorrect (or your account is not an Admin/Officer).';
                 }
 
                 if (isSelf) currentPasswordRef.current = updates.password;
@@ -315,7 +318,6 @@ function App() {
                 if (error) throw error;
             }
 
-            alert("Profile updated successfully!");
 
             if (idToUpdate === currentMember?.id) {
                 const refreshed: any = { ...currentMember, ...updates };
@@ -324,7 +326,8 @@ function App() {
             }
 
             fetchCoreData();
-        } catch (e: any) { alert("Error updating profile: " + e.message); }
+            return null;
+        } catch (e: any) { return "Error updating profile: " + e.message; }
     };
 
     const handleToggleAttendance = async (gameId: string, memberId: string) => {

@@ -104,8 +104,11 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
     const handleNameNext = (e: React.FormEvent) => {
         e.preventDefault();
         setNotFound(false);
+        // Normalize both sides: stray/double spaces in a stored name (e.g. "Ornelas ")
+        // used to make exact-match fail and lock members out of check-in.
+        const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const found = members.find(m =>
-            `${m.firstName} ${m.lastName}`.toLowerCase() === name.toLowerCase().trim()
+            norm(`${m.firstName} ${m.lastName}`) === norm(name)
         );
 
         if (found) {

@@ -35,11 +35,13 @@ interface ScrapedGame {
 // first (fast, no third-party dependency when it works), and these proxies
 // are the fallback since they're already proven to get through from the
 // client's AutoFillModal.
+// corsproxy.io removed: as of 2026-08, its anonymous endpoint 403s with
+// "keyless_legacy_url" and requires a paid API key — it can no longer serve
+// as a free fallback here.
 const PROXIES = [
   (url: string) => `https://cors-get-proxy.sirjosh.workers.dev/?url=${encodeURIComponent(url)}`,
   (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
   (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
 ];
 
 function parseCalendarPayload(contents: any): ScrapedGame[] {

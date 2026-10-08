@@ -230,7 +230,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                             value={referredBy}
                             onChange={e => setReferredBy(e.target.value)}
                             className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
-                            placeholder="A BearPit member's name"
+                            placeholder="Their first AND last name, so they get recruiting credit"
                         />
                     </div>
 

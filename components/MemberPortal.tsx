@@ -6,15 +6,26 @@ import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { Management } from './Management';
 import { Leaderboard } from './Leaderboard';
-import { SelfieContest } from './SelfieContest';
-import { Heart } from 'lucide-react';
-import { POINT_CATEGORIES, FAN_TIERS } from '../constants';
+import { FAN_TIERS } from '../constants';
+import { formatLocalDate, parseLocalDate } from '../utils/dateUtils';
+import { computeLifetimeStats, gamePointValue } from '../utils/fanTier';
+import { semesterOf, currentSemester } from '../utils/semester';
+
+const formatUpcomingDate = (dateStr: string) =>
+    parseLocalDate(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+// "19:00" -> "7:00 PM"
+const formatTime = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    if (Number.isNaN(h)) return time;
+    return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+};
 
 interface MemberPortalProps {
     member: Member;
     data: AppState;
     onLogout: () => void;
-    onUpdateProfile: (updates: Partial<Member>) => void; // Updated signature
+    onUpdateProfile: (updates: Partial<Member>, memberId?: string, actingPassword?: string) => Promise<string | null | void> | void;
     // Passing these down for Officer editing capabilities
     onAddGame?: (g: Game) => void;
     onDeleteGame?: (id: string) => void;
@@ -27,7 +38,8 @@ interface MemberPortalProps {
 }
 
 export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports, onAddClubEvent, onDeleteClubEvent, onSignUpForEvent, onCancelSignup }) => {
-    const [view, setView] = useState<'leaderboard' | 'vote' | 'stats' | 'calendar' | 'events' | 'edit_calendar'>('leaderboard');
+    // 'vote' (selfie contest) tab removed 2026-10-02 while the selfie gallery is broken.
+    const [view, setView] = useState<'leaderboard' | 'stats' | 'calendar' | 'events' | 'edit_calendar'>('leaderboard');
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
     const [showDayModal, setShowDayModal] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -40,50 +52,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
     // for the next level" instead of a single attendance percentage against
     // a spring/fall sport threshold).
     const stats = useMemo(() => {
-        // "Game Attendance" is its own category, earned automatically from
-        // check-ins (home games worth 1pt, bonus games worth 1 extra pt --
-        // matches PointsTable's scoring so the leaderboard and this view
-        // never disagree).
-        let gameAttendancePoints = 0;
-        data.games.forEach(g => {
-            if (data.attendance[g.id]?.[member.id]) {
-                gameAttendancePoints += 1;
-                if (g.isBonus) gameAttendancePoints += 1;
-            }
-        });
-
-        const myBonusPoints = data.bonusPoints.filter(b => b.memberId === member.id);
-
-        const categories = [
-            { name: 'Game Attendance', points: gameAttendancePoints, icon: 'game' as const },
-            ...POINT_CATEGORIES.map(name => ({
-                name,
-                points: myBonusPoints.filter(b => (b.category || 'Other') === name).reduce((sum, b) => sum + b.points, 0),
-                icon: 'category' as const,
-            })),
-        ];
-
-        const totalPoints = categories.reduce((sum, c) => sum + c.points, 0)
-            + (member.role === Role.ADMIN || member.role === Role.OFFICER ? 5 : 0);
-
-        // Fan tier: highest tier where the member meets BOTH the points and
-        // the breadth (distinct categories) requirement. 'Other' is excluded
-        // from breadth so misc adjustments can't unlock a tier.
-        const categoriesEarned = categories.filter(c => c.name !== 'Other' && c.points > 0).length;
-        let tierIndex = 0;
-        FAN_TIERS.forEach((t, i) => {
-            if (totalPoints >= t.minPoints && categoriesEarned >= t.minCategories) tierIndex = i;
-        });
-        const nextTier = FAN_TIERS[tierIndex + 1];
-        const tier = {
-            name: FAN_TIERS[tierIndex].name,
-            next: nextTier ? {
-                name: nextTier.name,
-                pointsNeeded: Math.max(0, nextTier.minPoints - totalPoints),
-                categoriesNeeded: Math.max(0, nextTier.minCategories - categoriesEarned),
-                progressPct: Math.min(100, Math.round((Math.max(0, totalPoints) / nextTier.minPoints) * 100)),
-            } : null,
-        };
+        const { totalPoints, categories, categoriesEarned, tier, myBonusPoints } = computeLifetimeStats(member, data);
 
         // Recent activity feed: combine game check-ins + manual bonus point
         // entries into one "where are my points coming from" timeline.
@@ -94,7 +63,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 date: g.date,
                 label: g.opponent,
                 sub: g.location,
-                points: g.isBonus ? 2 : 1,
+                points: gamePointValue(g),
                 isBonus: g.isBonus,
             }));
         const bonusHistory = myBonusPoints.map(b => ({
@@ -107,8 +76,45 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
         }));
         const activity = [...gameHistory, ...bonusHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        return { totalPoints, categories, categoriesEarned, tier, activity };
+        const thisSemester = currentSemester();
+        const semesterPoints = activity
+            .filter(a => semesterOf(a.date).key === thisSemester.key)
+            .reduce((sum, a) => sum + a.points, 0);
+
+        return { totalPoints, categories, categoriesEarned, tier, activity, semesterPoints, semesterLabel: thisSemester.label };
     }, [data, member.id, member.role]);
+
+    // Next few games + club events, shown above the leaderboard.
+    const upcoming = useMemo(() => {
+        const today = formatLocalDate(new Date());
+        const games = data.games
+            .filter(g => g.date.slice(0, 10) >= today)
+            .map(g => ({
+                id: `g_${g.id}`,
+                kind: 'game' as const,
+                date: g.date.slice(0, 10),
+                time: g.time,
+                title: `${data.sports.find(s => s.id === g.sportId)?.name || 'Game'} vs ${g.opponent}`,
+                sub: g.location,
+                points: gamePointValue(g),
+                isBonus: g.isBonus,
+            }));
+        const events = data.clubEvents
+            .filter(e => e.date >= today)
+            .map(e => ({
+                id: `e_${e.id}`,
+                kind: 'event' as const,
+                date: e.date,
+                time: e.time,
+                title: e.title,
+                sub: e.location || '',
+                points: e.pointsValue,
+                isBonus: false,
+            }));
+        return [...games, ...events]
+            .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
+            .slice(0, 6);
+    }, [data.games, data.clubEvents, data.sports]);
 
     const handleDayClick = (date: Date) => {
         setSelectedDay(date);
@@ -137,7 +143,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 </div>
             </header>
 
-            <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+            <main className="max-w-5xl mx-auto px-4 pt-6 pb-24 space-y-6">
                 {/* Welcome Card */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
@@ -152,12 +158,6 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                             className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-bold transition-all ${view === 'leaderboard' ? 'bg-white text-[#154734] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                             <Trophy className="w-4 h-4" /> Leaderboard
-                        </button>
-                        <button
-                            onClick={() => setView('vote')}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-bold transition-all ${view === 'vote' ? 'bg-white text-[#154734] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            <Heart className="w-4 h-4" /> Vote
                         </button>
                         <button
                             onClick={() => setView('stats')}
@@ -189,12 +189,41 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 </div>
 
                 {view === 'leaderboard' ? (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                        {/* Upcoming -- so members don't have to dig through the calendar tab */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <CalendarIcon className="w-4 h-4" /> Upcoming Events
+                                </h3>
+                                <button onClick={() => setView('calendar')} className="text-xs font-bold text-[#154734] hover:underline">Full calendar</button>
+                            </div>
+                            <div className="divide-y divide-gray-100">
+                                {upcoming.length > 0 ? upcoming.map(u => (
+                                    <div key={u.id} className="px-6 py-3 flex items-center justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-gray-900 truncate">{u.title}</p>
+                                            <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                                                <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {formatUpcomingDate(u.date)}{u.time ? ` · ${formatTime(u.time)}` : ''}</span>
+                                                {u.sub && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {u.sub}</span>}
+                                            </div>
+                                        </div>
+                                        {u.kind === 'event' ? (
+                                            <button onClick={() => setView('events')} className="text-xs font-bold text-[#154734] bg-[#FFB81C] hover:bg-yellow-400 px-3 py-1.5 rounded-lg shrink-0">
+                                                Sign Up
+                                            </button>
+                                        ) : (
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${u.isBonus ? 'bg-[#FFB81C]/20 text-yellow-800' : 'bg-[#154734]/10 text-[#154734]'}`}>
+                                                +{u.points} pt{u.points === 1 ? '' : 's'}
+                                            </span>
+                                        )}
+                                    </div>
+                                )) : (
+                                    <div className="p-6 text-center text-gray-500 text-sm">Nothing on the schedule yet. Check back soon.</div>
+                                )}
+                            </div>
+                        </div>
                         <Leaderboard data={data} />
-                    </div>
-                ) : view === 'vote' ? (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <SelfieContest data={data} currentMember={member} onVote={onVote} />
                     </div>
                 ) : view === 'edit_calendar' && canEdit && sports && onAddGame && onDeleteGame ? (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -226,10 +255,20 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                         {/* Total Points */}
                         <div className="bg-[#154734] rounded-xl p-6 text-white shadow-md border border-[#0f3325] flex items-center justify-between">
-                            <div>
-                                <p className="text-[#FFB81C] text-sm font-bold uppercase tracking-wide">Total Points</p>
-                                <div className="mt-1 flex items-baseline gap-2">
-                                    <span className="text-4xl font-bold">{stats.totalPoints}</span>
+                            <div className="flex gap-8">
+                                <div>
+                                    <p className="text-[#FFB81C] text-sm font-bold uppercase tracking-wide">{stats.semesterLabel}</p>
+                                    <div className="mt-1 flex items-baseline gap-2">
+                                        <span className="text-4xl font-bold">{stats.semesterPoints}</span>
+                                        <span className="text-xs text-white/60">leaderboard</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-[#FFB81C] text-sm font-bold uppercase tracking-wide">Lifetime</p>
+                                    <div className="mt-1 flex items-baseline gap-2">
+                                        <span className="text-4xl font-bold">{stats.totalPoints}</span>
+                                        <span className="text-xs text-white/60">fan level</span>
+                                    </div>
                                 </div>
                             </div>
                             <div className="text-right">
@@ -294,8 +333,8 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                     <TrendingUp className="w-4 h-4" /> Recent Points Activity
                                 </h3>
                             </div>
-                            <div className="divide-y divide-gray-100">
-                                {stats.activity.length > 0 ? stats.activity.slice(0, 25).map((a, idx) => (
+                            <div className="divide-y divide-gray-100 max-h-[70vh] overflow-y-auto">
+                                {stats.activity.length > 0 ? stats.activity.map((a, idx) => (
                                     <div key={idx} className="p-4 flex items-center justify-between hover:bg-gray-50">
                                         <div className="flex items-center gap-4">
                                             <div className="bg-green-100 p-2 rounded-full text-[#154734]">

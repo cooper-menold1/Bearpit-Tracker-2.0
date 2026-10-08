@@ -8,13 +8,18 @@ interface SettingsModalProps {
     onClose: () => void;
     member: Member;
     sports: Sport[];
-    onUpdateProfile: (updates: Partial<Member>, memberId?: string) => void;
+    // Resolves to an error message, or null/undefined on success.
+    onUpdateProfile: (updates: Partial<Member>, memberId?: string, actingPassword?: string) => Promise<string | null | void> | void;
     adminMode?: boolean;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, member, sports, onUpdateProfile, adminMode = false }) => {
     const [newPassword, setNewPassword] = useState('');
     const [confirm, setConfirm] = useState('');
+    // The acting user's own password, required for any password change. Asked for
+    // here because the in-memory copy from login is lost on a page refresh.
+    const [actingPassword, setActingPassword] = useState('');
+    const [saving, setSaving] = useState(false);
     const [email, setEmail] = useState(member.email || '');
     const [fallSportId, setFallSportId] = useState(member.fallSportId || '');
     const [springSportId, setSpringSportId] = useState(member.springSportId || '');
@@ -29,13 +34,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
         setIsChair(member.isChair || false);
         setNewPassword('');
         setConfirm('');
+        setActingPassword('');
+        setLocalError('');
     }, [member.id, isOpen]);
 
     if (!isOpen) return null;
 
     const eligibleSports = sports.filter(s => !s.name.toLowerCase().includes('basketball') && !s.name.toLowerCase().includes('bball'));
 
-    const handleSave = () => {
+    const handleSave = async () => {
         setLocalError('');
         const updates: Partial<Member> = {};
 
@@ -48,6 +55,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
                 setLocalError("Passwords do not match");
                 return;
             }
+            if (!actingPassword) {
+                setLocalError(adminMode ? 'Enter your own admin password to confirm the reset.' : 'Enter your current password.');
+                return;
+            }
             updates.password = newPassword;
         }
 
@@ -56,13 +67,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
         if (springSportId !== member.springSportId) updates.springSportId = springSportId;
         if (isChair !== member.isChair) updates.isChair = isChair;
 
-        onUpdateProfile(updates, member.id);
+        setSaving(true);
+        const err = await Promise.resolve(onUpdateProfile(updates, member.id, actingPassword || undefined));
+        setSaving(false);
+        if (err) {
+            setLocalError(err);
+            return;
+        }
 
         setLocalSuccess(true);
         setTimeout(() => {
             setLocalSuccess(false);
             setNewPassword('');
             setConfirm('');
+            setActingPassword('');
             onClose();
         }, 1500);
     };
@@ -154,6 +172,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
                                         name="member_confirm_password_field"
                                     />
                                 </div>
+                                {newPassword && (
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">{adminMode ? 'Your Admin Password (to confirm)' : 'Current Password'}</label>
+                                        <input
+                                            type="password"
+                                            value={actingPassword}
+                                            onChange={(e) => setActingPassword(e.target.value)}
+                                            className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-[#FFB81C]"
+                                            placeholder={adminMode ? 'Your own password, not theirs' : 'Your current password'}
+                                            autoComplete="current-password"
+                                            name="acting_password_field"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {localError && <div className="text-red-500 text-sm bg-red-50 p-2 rounded border border-red-100">{localError}</div>}
@@ -161,9 +193,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
                             <button
                                 type="button"
                                 onClick={handleSave}
-                                className="w-full bg-[#154734] text-white py-3.5 rounded-lg font-bold hover:bg-[#0f3325] transition-all shadow-md active:scale-[0.98]"
+                                disabled={saving}
+                                className="disabled:opacity-60 w-full bg-[#154734] text-white py-3.5 rounded-lg font-bold hover:bg-[#0f3325] transition-all shadow-md active:scale-[0.98]"
                             >
-                                Save Changes
+                                {saving ? 'Saving...' : 'Save Changes'}
                             </button>
                         </form>
                     </div>

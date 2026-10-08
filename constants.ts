@@ -11,7 +11,7 @@ export const VENUES: Venue[] = [
   { id: 'bettylou', name: 'Betty Lou Mays Field', latitude: 31.55177, longitude: -97.10909, radiusMeters: 200 },
   { id: 'hurd', name: 'Hurd Tennis Center', latitude: 31.55177, longitude: -97.10909, radiusMeters: 200 }, // Shares space with soccer
   { id: 'ferrell_vb', name: 'Ferrell Center (Volleyball)', latitude: 31.547903, longitude: -97.105969, radiusMeters: 200 },
-  { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.546944, longitude: -97.116667, radiusMeters: 350 } // widened to cover the whole building footprint plus surrounding roads for meeting check-ins
+  { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.546944, longitude: -97.116667, radiusMeters: 1000 } // widened to ~1 km so meeting check-ins work from anywhere around Foster
 ];
 
 // Officer-assigned point categories, from the points menu presented at the

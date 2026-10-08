@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { AppState, Role } from '../types';
-import { Trophy, Medal, Filter, TrendingUp, Users } from 'lucide-react';
+import { Trophy, Medal, Filter, TrendingUp, Users, CalendarRange } from 'lucide-react';
+import { POINT_CATEGORIES } from '../constants';
+import { semesterOf, currentSemester, listSemesters } from '../utils/semester';
+import { computeLifetimeStats, gamePointValue } from '../utils/fanTier';
+
+const GAME_ATTENDANCE = 'Game Attendance';
+const ALL_CATEGORIES = 'all';
 
 interface LeaderboardProps {
     data: AppState;
@@ -9,41 +15,65 @@ interface LeaderboardProps {
 export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
     const [filterSportId, setFilterSportId] = useState<string>('all');
     const [leaderboardType, setLeaderboardType] = useState<'points' | 'attendance'>('points');
+    const [semesterKey, setSemesterKey] = useState<string>(currentSemester().key);
+    const [category, setCategory] = useState<string>(ALL_CATEGORIES);
+
+    const semesters = useMemo(
+        () => listSemesters([...data.games.map(g => g.date), ...(data.bonusPoints || []).map(b => b.date)]),
+        [data.games, data.bonusPoints]
+    );
+    // Leaderboard spots are earned per semester; lifetime points only set the fan level badge.
+    const inSemester = (dateStr: string) => semesterOf(dateStr).key === semesterKey;
+
+    // Category view only ranks by points; the sport filter only applies to game points.
+    const categoryView = leaderboardType === 'points' && category !== ALL_CATEGORIES;
+    const showSportFilter = !categoryView || category === GAME_ATTENDANCE;
 
     const leaderboard = useMemo(() => {
-        return data.members.map(member => {
+        const rows = data.members.map(member => {
             let gamePoints = 0;
             let gamesAttended = 0;
 
             // 1. Calculate Game Points & Attendance
             data.games.forEach(game => {
-                // Apply Sport Filter
+                // Apply Sport + Semester Filters
                 if (filterSportId !== 'all' && game.sportId !== filterSportId) return;
+                if (!inSemester(game.date)) return;
 
                 if (data.attendance[game.id]?.[member.id]) {
-                    gamePoints += (game.pointsValue || 1); // Default to 1 if missing
+                    gamePoints += gamePointValue(game);
                     gamesAttended++;
                 }
             });
 
             // 2. Calculate Bonus Points (Manual)
             let bonusPoints = 0;
-            if (filterSportId === 'all') {
-                data.bonusPoints?.forEach(bp => {
-                    if (bp.memberId === member.id) {
-                        bonusPoints += bp.points;
-                    }
-                });
-            }
+            const byCategory: Record<string, number> = { [GAME_ATTENDANCE]: gamePoints };
+            data.bonusPoints?.forEach(bp => {
+                if (bp.memberId === member.id && inSemester(bp.date)) {
+                    bonusPoints += bp.points;
+                    const cat = bp.category || 'Other';
+                    byCategory[cat] = (byCategory[cat] || 0) + bp.points;
+                }
+            });
+            // Bonus points aren't tied to a sport, so a sport filter drops them.
+            if (filterSportId !== 'all') bonusPoints = 0;
 
             return {
                 ...member,
                 gamePoints,
                 bonusPoints,
                 gamesAttended,
+                categoryPoints: byCategory[category] || 0,
+                fanLevel: computeLifetimeStats(member, data).tier,
                 totalPoints: gamePoints + bonusPoints
             };
-        })
+        });
+
+        if (categoryView) {
+            return rows.filter(r => r.categoryPoints !== 0).sort((a, b) => b.categoryPoints - a.categoryPoints);
+        }
+        return rows
             .sort((a, b) => {
                 if (leaderboardType === 'points') {
                     return b.totalPoints - a.totalPoints;
@@ -55,7 +85,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                     return b.totalPoints - a.totalPoints;
                 }
             });
-    }, [data, filterSportId, leaderboardType]);
+    }, [data, filterSportId, leaderboardType, semesterKey, category]);
 
     // Top 3 Styling
     const getRankStyle = (index: number) => {
@@ -95,20 +125,48 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                     </button>
                 </div>
 
-                <div className="flex items-center gap-2 self-start md:self-auto">
-                    <Filter className="w-4 h-4 text-gray-500" />
+                <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+                    <CalendarRange className="w-4 h-4 text-gray-500" />
                     <select
-                        value={filterSportId}
-                        onChange={(e) => setFilterSportId(e.target.value)}
+                        value={semesterKey}
+                        onChange={(e) => setSemesterKey(e.target.value)}
                         className="bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#154734] outline-none"
                     >
-                        <option value="all">All Sports</option>
-                        {data.sports.map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
+                        {semesters.map(s => (
+                            <option key={s.key} value={s.key}>{s.label}</option>
                         ))}
                     </select>
+                    {showSportFilter && (
+                        <>
+                            <Filter className="w-4 h-4 text-gray-500" />
+                            <select
+                                value={filterSportId}
+                                onChange={(e) => setFilterSportId(e.target.value)}
+                                className="bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#154734] outline-none"
+                            >
+                                <option value="all">All Sports</option>
+                                {data.sports.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
+                        </>
+                    )}
                 </div>
             </div>
+
+            {leaderboardType === 'points' && (
+                <div className="flex gap-2 overflow-x-auto pb-1 -mt-2">
+                    {[ALL_CATEGORIES, GAME_ATTENDANCE, ...POINT_CATEGORIES].map(c => (
+                        <button
+                            key={c}
+                            onClick={() => setCategory(c)}
+                            className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border transition-colors ${category === c ? 'bg-[#154734] text-white border-[#154734]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#154734]'}`}
+                        >
+                            {c === ALL_CATEGORIES ? 'All Categories' : c}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -117,7 +175,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                             <tr>
                                 <th className="px-6 py-3 w-16 text-center">Rank</th>
                                 <th className="px-6 py-3">Member</th>
-                                {leaderboardType === 'attendance' ? (
+                                {categoryView ? (
+                                    <th className="px-6 py-3 text-right font-bold">{category} Points</th>
+                                ) : leaderboardType === 'attendance' ? (
                                     <>
                                         <th className="px-6 py-3 text-right font-bold">Games Attended</th>
                                         <th className="px-6 py-3 text-right">Points</th>
@@ -139,6 +199,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                                     </td>
                                     <td className="px-6 py-4 font-medium text-gray-900">
                                         {member.firstName} {member.lastName}
+                                        <span className={`ml-2 text-[10px] uppercase px-1.5 py-0.5 rounded font-bold ${member.fanLevel.index > 0 ? 'bg-[#FFB81C]/20 text-yellow-800' : 'bg-gray-100 text-gray-400'}`}>
+                                            {member.fanLevel.name}
+                                        </span>
                                         {member.role !== Role.MEMBER && (
                                             <span className="ml-2 text-[10px] uppercase bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-bold">
                                                 {member.role}
@@ -146,7 +209,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                                         )}
                                     </td>
 
-                                    {leaderboardType === 'attendance' ? (
+                                    {categoryView ? (
+                                        <td className="px-6 py-4 text-right font-bold text-lg text-[#154734]">
+                                            {member.categoryPoints}
+                                        </td>
+                                    ) : leaderboardType === 'attendance' ? (
                                         <>
                                             <td className="px-6 py-4 text-right font-bold text-lg text-[#154734]">
                                                 {member.gamesAttended}
@@ -175,6 +242,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                                     )}
                                 </tr>
                             ))}
+                            {leaderboard.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="p-8 text-center text-gray-400 italic">No points in this category yet.</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
