@@ -35,13 +35,13 @@ export const Instructions: React.FC<InstructionsProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full flex flex-col">
+            <div role="dialog" aria-modal="true" aria-labelledby="system-connection-title" className="bg-white rounded-xl shadow-2xl max-w-lg w-full flex flex-col">
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-[#154734] rounded-t-xl">
                     <div className="flex items-center gap-2 text-white">
                         <Server className="w-6 h-6" />
-                        <h2 className="text-xl font-bold">System Connection</h2>
+                        <h2 id="system-connection-title" className="text-xl font-bold">System Connection</h2>
                     </div>
-                    <button onClick={onClose} className="text-white/70 hover:text-white">
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-white/70 hover:text-white">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -56,6 +56,7 @@ export const Instructions: React.FC<InstructionsProps> = ({
                         <div>
                             <input
                                 type="text"
+                                aria-label="Public URL"
                                 className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#154734] bg-white"
                                 value={urlInput}
                                 onChange={(e) => setUrlInput(e.target.value)}

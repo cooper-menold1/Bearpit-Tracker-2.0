@@ -46,12 +46,18 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                     {/* View Toggle */}
                     <div className="flex bg-gray-200 rounded-lg p-0.5">
                         <button
+                            type="button"
+                            aria-label="Calendar view"
+                            aria-pressed={viewMode === 'calendar'}
                             onClick={() => setViewMode('calendar')}
                             className={`p-1.5 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-[#154734]' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                             <Calendar className="w-4 h-4" />
                         </button>
                         <button
+                            type="button"
+                            aria-label="List view"
+                            aria-pressed={viewMode === 'list'}
                             onClick={() => setViewMode('list')}
                             className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-[#154734]' : 'text-gray-500 hover:text-gray-700'}`}
                         >
@@ -62,6 +68,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
 
                 <div className="flex items-center gap-2">
                     <select
+                        aria-label="Filter by sport"
                         value={selectedSportId}
                         onChange={(e) => setSelectedSportId(e.target.value)}
                         className="bg-white text-[#154734] px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm font-bold text-xs outline-none focus:ring-1 focus:ring-[#154734] hover:bg-gray-50 transition-colors"
@@ -74,10 +81,10 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                     {headerActions}
                     {viewMode === 'calendar' && (
                         <div className="flex bg-white rounded-lg border border-gray-300 shadow-sm">
-                            <button onClick={prevMonth} className="p-2 hover:bg-gray-100 text-gray-600 border-r border-gray-300">
+                            <button type="button" onClick={prevMonth} aria-label="Previous month" className="p-2 hover:bg-gray-100 text-gray-600 border-r border-gray-300">
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
-                            <button onClick={nextMonth} className="p-2 hover:bg-gray-100 text-gray-600">
+                            <button type="button" onClick={nextMonth} aria-label="Next month" className="p-2 hover:bg-gray-100 text-gray-600">
                                 <ChevronRight className="w-5 h-5" />
                             </button>
                         </div>
@@ -115,6 +122,14 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                                 <div
                                     key={day}
                                     className={`bg-white min-h-[100px] p-2 hover:bg-blue-50 transition-colors cursor-pointer relative group flex flex-col gap-1`}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            onDayClick(cellDate);
+                                        }
+                                    }}
                                     onClick={() => onDayClick(cellDate)}
                                     onContextMenu={(e) => onDayContextMenu && onDayContextMenu(e, cellDate)}
                                 >
@@ -155,7 +170,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                             const date = parseLocalDate(game.date);
                             const sport = sports.find(s => s.id === game.sportId);
                             return (
-                                <div key={game.id} onClick={() => onDayClick(parseLocalDate(game.date))} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:bg-blue-50 cursor-pointer transition-colors group">
+                                <div key={game.id} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDayClick(parseLocalDate(game.date)); } }} onClick={() => onDayClick(parseLocalDate(game.date))} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:bg-blue-50 cursor-pointer transition-colors group">
                                     <div className="flex items-center gap-4">
                                         <div className="bg-[#154734] text-white w-14 h-14 rounded-lg flex flex-col items-center justify-center shrink-0">
                                             <span className="text-xs font-bold uppercase">{date.toLocaleString('default', { month: 'short' })}</span>

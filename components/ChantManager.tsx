@@ -119,12 +119,12 @@ export const ChantManager: React.FC<ChantManagerProps> = ({ isOpen, onClose }) =
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div role="dialog" aria-modal="true" aria-labelledby="manage-chants-title" className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="bg-[#154734] p-4 flex justify-between items-center text-white shrink-0">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
+                    <h3 id="manage-chants-title" className="font-bold text-lg flex items-center gap-2">
                         <Music className="w-5 h-5" /> Manage Chants
                     </h3>
-                    <button onClick={onClose} className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
+                    <button type="button" onClick={onClose} aria-label="Close" className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
                 </div>
 
                 <div className="p-6 space-y-6 overflow-y-auto">
@@ -133,6 +133,7 @@ export const ChantManager: React.FC<ChantManagerProps> = ({ isOpen, onClose }) =
                         <h4 className="font-bold text-[#154734] text-sm uppercase tracking-wide">Upload New Chant</h4>
                         <input
                             type="text"
+                            aria-label="Chant title"
                             placeholder="Chant Title (e.g. 'Sic Em Bears')"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
@@ -141,6 +142,7 @@ export const ChantManager: React.FC<ChantManagerProps> = ({ isOpen, onClose }) =
                         <div className="flex gap-2">
                             <input
                                 type="file"
+                                aria-label="Chant image file"
                                 accept="image/*"
                                 onChange={handleFileChange}
                                 className="block w-full text-sm text-gray-500
@@ -177,11 +179,13 @@ export const ChantManager: React.FC<ChantManagerProps> = ({ isOpen, onClose }) =
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-bold text-[#154734] truncate">{chant.title}</p>
-                                            <p className="text-xs text-gray-400">{new Date(chant.createdAt).toLocaleDateString()}</p>
+                                            <p className="text-xs text-gray-500">{new Date(chant.createdAt).toLocaleDateString()}</p>
                                         </div>
                                         <button
+                                            type="button"
                                             onClick={() => handleDelete(chant.id, chant.imageUrl)}
-                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                            aria-label={`Delete chant ${chant.title}`}
+                                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>

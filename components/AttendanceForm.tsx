@@ -178,7 +178,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Your Name</label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                    <input
+                                    <input aria-label="Your name"
                                         type="text"
                                         required
                                         value={name}
@@ -214,7 +214,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Current Date</label>
                                 <div className="relative">
                                     <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                    <input
+                                    <input aria-label="Current date"
                                         type="text"
                                         disabled
                                         value={todayStr}
@@ -228,7 +228,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                 <div className="relative">
                                     <Trophy className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                                     {todaysGames.length > 0 ? (
-                                        <select
+                                        <select aria-label="Game"
                                             value={selectedGameId}
                                             onChange={e => handleGameChange(e.target.value)}
                                             className="pl-10 w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"

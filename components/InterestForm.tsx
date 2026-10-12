@@ -144,7 +144,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">First Name</label>
-                            <input
+                            <input aria-label="First name"
                                 type="text"
                                 required
                                 value={firstName}
@@ -155,7 +155,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Last Name</label>
-                            <input
+                            <input aria-label="Last name"
                                 type="text"
                                 required
                                 value={lastName}
@@ -168,7 +168,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
 
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Baylor Email</label>
-                        <input
+                        <input aria-label="Baylor email"
                             type="email"
                             required
                             value={email}
@@ -185,7 +185,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                             Phone Number <span className="text-gray-400 font-normal">(optional)</span>
                         </label>
-                        <input
+                        <input aria-label="Phone number"
                             type="tel"
                             value={phone}
                             onChange={e => setPhone(e.target.value)}
@@ -198,7 +198,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                             Class Year <span className="text-gray-400 font-normal">(optional)</span>
                         </label>
-                        <select
+                        <select aria-label="Class year"
                             value={year}
                             onChange={e => setYear(e.target.value)}
                             className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
@@ -212,7 +212,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                             How did you hear about us? <span className="text-gray-400 font-normal">(optional)</span>
                         </label>
-                        <select
+                        <select aria-label="How did you hear about us"
                             value={heardAbout}
                             onChange={e => setHeardAbout(e.target.value)}
                             className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
@@ -226,7 +226,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                             Who recommended you? <span className="text-gray-400 font-normal">(optional)</span>
                         </label>
-                        <input
+                        <input aria-label="Who recommended you"
                             type="text"
                             value={referredBy}
                             onChange={e => setReferredBy(e.target.value)}

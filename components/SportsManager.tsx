@@ -49,13 +49,13 @@ export const SportsManager: React.FC<SportsManagerProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[85vh]">
+      <div role="dialog" aria-modal="true" aria-labelledby="manage-sports-title" className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[85vh]">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-[#154734] rounded-t-xl">
           <div className="flex items-center gap-2 text-white">
             <Trophy className="w-6 h-6" />
-            <h2 className="text-xl font-bold">Manage Sports</h2>
+            <h2 id="manage-sports-title" className="text-xl font-bold">Manage Sports</h2>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white">
+          <button type="button" onClick={onClose} aria-label="Close" className="text-white/70 hover:text-white">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -64,7 +64,7 @@ export const SportsManager: React.FC<SportsManagerProps> = ({
           <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
             <label className="block text-sm font-bold text-gray-700 mb-2">Add New Sport</label>
             <div className="flex flex-col gap-3">
-              <input
+              <input aria-label="New sport name"
                 type="text"
                 value={newSportName}
                 onChange={(e) => setNewSportName(e.target.value)}
@@ -119,9 +119,11 @@ export const SportsManager: React.FC<SportsManagerProps> = ({
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <span className="font-bold text-gray-800 text-lg">{sport.name}</span>
-                        <span className="text-xs text-gray-400 ml-2">({gameCount} games)</span>
+                        <span className="text-xs text-gray-500 ml-2">({gameCount} games)</span>
                       </div>
                       <button
+                        type="button"
+                        aria-label={`Delete ${sport.name}`}
                         onClick={() => handleDelete(sport.id)}
                         className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 rounded transition-colors"
                         title="Delete Sport"

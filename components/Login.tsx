@@ -98,7 +98,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                 <div className="absolute inset-0 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-0 opacity-40">
                     {recentSelfies.map(selfie => (
                         <div key={selfie.id} className="relative aspect-square overflow-hidden">
-                            <img src={selfie.imageData} alt="Selfie" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
+                            <img src={selfie.imageData} alt="" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
                         </div>
                     ))}
                     {Array.from({ length: Math.max(0, 30 - recentSelfies.length) }).map((_, i) => (
@@ -205,7 +205,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                         </div>
                     </div>
                 </div>
-                <div className="bg-[#0a2319] w-full py-12 text-center text-white/20 text-sm border-t border-white/5">
+                <div className="bg-[#0a2319] w-full py-12 text-center text-white/60 text-sm border-t border-white/5">
                     <p>&copy; {new Date().getFullYear()} Baylor BearPit. All rights reserved.</p>
                     <p className="mt-2 text-white/50"><PrivacyLink /></p>
                 </div>
@@ -213,8 +213,10 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
 
             {showPortal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-[#154734] rounded-3xl shadow-2xl border border-[#FFB81C]/20 p-8 max-w-md w-full relative overflow-hidden">
+                    <div role="dialog" aria-modal="true" aria-labelledby="member-portal-title" className="bg-[#154734] rounded-3xl shadow-2xl border border-[#FFB81C]/20 p-8 max-w-md w-full relative overflow-hidden">
                         <button
+                            type="button"
+                            aria-label="Close member portal"
                             onClick={() => setShowPortal(false)}
                             className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
                         >
@@ -227,12 +229,13 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                             <div className="bg-[#FFB81C] p-6 rounded-full text-[#154734] shadow-lg w-20 h-20 mx-auto flex items-center justify-center mb-6">
                                 <User className="w-10 h-10" />
                             </div>
-                            <h3 className="text-3xl font-extrabold text-[#FFB81C] mb-2">Member Portal</h3>
+                            <h3 id="member-portal-title" className="text-3xl font-extrabold text-[#FFB81C] mb-2">Member Portal</h3>
                             <p className="text-white/70 text-sm">Enter Baylor Email or Full Name</p>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
                             <input
                                 type="text"
+                                aria-label="Email or full name"
                                 placeholder="Email or Full Name"
                                 className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
                                 value={email}
@@ -242,6 +245,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                             />
                             <input
                                 type="password"
+                                aria-label="Password"
                                 placeholder="Password"
                                 className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
                                 value={password}

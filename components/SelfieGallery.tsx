@@ -49,14 +49,14 @@ export const SelfieGallery: React.FC<SelfieGalleryProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div role="dialog" aria-modal="true" aria-labelledby="photo-gallery-title" className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-[#154734] shrink-0">
                     <div>
-                        <h2 className="text-2xl font-bold text-white">Photo Gallery</h2>
+                        <h2 id="photo-gallery-title" className="text-2xl font-bold text-white">Photo Gallery</h2>
                         <p className="text-green-200 text-sm">Verify member attendance photos</p>
                     </div>
-                    <button onClick={onClose} className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <button type="button" aria-label="Close" onClick={onClose} className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-full transition-colors">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -178,7 +178,7 @@ const PhotoCard: React.FC<{
             <div className="aspect-square bg-gray-200 relative overflow-hidden">
                 <img
                     src={photo.imageData}
-                    alt="Selfie"
+                    alt={`Selfie by ${memberName}`}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     loading="lazy"
                 />
@@ -192,12 +192,14 @@ const PhotoCard: React.FC<{
                     )}
                 </div>
 
-                <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     {isAdmin && (
                         <button
+                            type="button"
                             onClick={() => onDelete(photo.id, photo.imageData)}
                             className="bg-red-500 text-white p-1.5 rounded-md hover:bg-red-600 transform scale-90 active:scale-95"
                             title="Delete Photo"
+                            aria-label="Delete photo"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
@@ -205,9 +207,11 @@ const PhotoCard: React.FC<{
 
                     {isAdmin && (
                         <button
+                            type="button"
                             onClick={() => onVote(photo.id, currentMember.id)}
                             className={`p-1.5 rounded-md transform scale-90 active:scale-95 transition-colors ${hasVoted ? 'bg-[#FFB81C] text-[#154734]' : 'bg-white/90 text-gray-500 hover:text-red-500'}`}
                             title={hasVoted ? "Remove Vote" : "Vote for this photo"}
+                            aria-label={hasVoted ? "Remove vote" : "Vote for this photo"}
                         >
                             <Heart className={`w-4 h-4 ${hasVoted ? 'fill-current' : ''}`} />
                         </button>

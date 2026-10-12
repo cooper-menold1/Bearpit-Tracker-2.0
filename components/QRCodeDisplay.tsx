@@ -41,10 +41,10 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ isOpen, onClose, p
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full text-center overflow-hidden flex flex-col">
+            <div role="dialog" aria-modal="true" aria-labelledby="qr-code-title" className="bg-white rounded-2xl shadow-2xl max-w-sm w-full text-center overflow-hidden flex flex-col">
                 <div className="bg-[#154734] p-6 flex justify-between items-center text-white shrink-0">
-                    <h2 className="font-bold text-xl uppercase tracking-wider">BearPit QR Code</h2>
-                    <button onClick={onClose} className="hover:bg-white/10 rounded-full p-1 transition-colors">
+                    <h2 id="qr-code-title" className="font-bold text-xl uppercase tracking-wider">BearPit QR Code</h2>
+                    <button type="button" onClick={onClose} aria-label="Close" className="hover:bg-white/10 rounded-full p-1 transition-colors">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -53,7 +53,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ isOpen, onClose, p
                     <div className="bg-white p-4 rounded-2xl border-4 border-[#FFB81C] shadow-inner">
                         <img
                             src={qrApiUrl}
-                            alt="QR Code"
+                            alt="BearPit check-in QR code"
                             className="w-56 h-56"
                             crossOrigin="anonymous"
                         />

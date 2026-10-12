@@ -448,7 +448,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 {/* Read-Only Day Details Modal (Only used in read-only calendar view) */}
                 {showDayModal && selectedDay && view !== 'edit_calendar' && (
                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+                        <div role="dialog" aria-modal="true" aria-label="Day details" className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
                             <div className="bg-[#154734] p-4 flex justify-between items-center">
                                 <div className="flex items-center gap-2 text-white">
                                     <div className="bg-[#FFB81C] text-[#154734] w-8 h-8 rounded flex items-center justify-center font-bold text-lg">
@@ -459,7 +459,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                         <p className="text-xs text-white/80 uppercase tracking-wide font-medium">{selectedDay.toLocaleDateString('en-US', { weekday: 'long' })}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowDayModal(false)} className="text-white/70 hover:text-white">
+                                <button type="button" aria-label="Close" onClick={() => setShowDayModal(false)} className="text-white/70 hover:text-white">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>

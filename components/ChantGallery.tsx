@@ -46,6 +46,7 @@ export const ChantGallery: React.FC<ChantGalleryProps> = ({ onBack }) => {
             <div className="p-4 flex items-center gap-4 border-b border-green-800/50 shrink-0">
                 <button
                     onClick={onBack}
+                    aria-label="Go back"
                     className="p-2 hover:bg-white/10 rounded-full transition-colors"
                 >
                     <ArrowLeft className="w-6 h-6" />
@@ -70,7 +71,16 @@ export const ChantGallery: React.FC<ChantGalleryProps> = ({ onBack }) => {
                     chants.map(chant => (
                         <div
                             key={chant.id}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Open chant: ${chant.title}`}
                             onClick={() => setSelectedChant(chant)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedChant(chant);
+                                }
+                            }}
                             className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden relative group cursor-pointer active:scale-[0.98] transition-all"
                         >
                             <img src={chant.imageUrl} alt={chant.title} className="w-full h-auto" />
@@ -90,10 +100,15 @@ export const ChantGallery: React.FC<ChantGalleryProps> = ({ onBack }) => {
             {/* Fullscreen Lightbox */}
             {selectedChant && (
                 <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={selectedChant.title || 'Chant image'}
                     className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center overflow-auto p-2 sm:p-4 animate-in fade-in duration-200"
                     onClick={() => setSelectedChant(null)}
                 >
                     <button
+                        type="button"
+                        aria-label="Close"
                         className="fixed top-4 right-4 bg-white/10 hover:bg-white/20 p-3 rounded-full text-white z-[110] transition-colors"
                         onClick={(e) => {
                             e.stopPropagation();
