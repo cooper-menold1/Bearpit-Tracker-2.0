@@ -75,7 +75,6 @@ export interface Selfie {
 }
 
 export interface Settings {
-    adminPassword?: string; // Fallback/Legacy
     publicUrl?: string;
 }
 

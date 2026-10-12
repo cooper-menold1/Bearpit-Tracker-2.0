@@ -675,7 +675,7 @@ function App() {
                 </Suspense>
             </main>
             <QRCodeDisplay isOpen={showQRCode} onClose={() => setShowQRCode(false)} publicUrl={data.settings.publicUrl} />
-            <Instructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} sheetUrl="" adminPassword={data.settings.adminPassword} onSaveUrl={() => { }} onSaveSettings={() => { }} />
+            <Instructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} sheetUrl="" onSaveUrl={() => { }} onSaveSettings={() => { }} />
             <Suspense fallback={null}>
                 {currentMember && (
                     <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} currentMember={currentMember} selfieVotes={data.selfieVotes} />
