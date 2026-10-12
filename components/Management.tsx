@@ -476,13 +476,13 @@ export const Management: React.FC<ManagementProps> = ({
                         {/* Day Details Modal (New) */}
                         {showDayDetails && selectedDate && (
                             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                                <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+                                <div role="dialog" aria-modal="true" aria-label="Games on selected day" className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
                                     <div className="bg-[#154734] p-4 flex justify-between items-center text-white shrink-0">
                                         <div>
                                             <h3 className="font-bold text-lg leading-none">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' })}</h3>
                                             <p className="text-white/80 text-sm">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                                         </div>
-                                        <button onClick={() => setShowDayDetails(false)} className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
+                                        <button type="button" aria-label="Close" onClick={() => setShowDayDetails(false)} className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
                                     </div>
 
                                     <div className="p-4 overflow-y-auto flex-1 bg-gray-50 space-y-3">
@@ -504,14 +504,14 @@ export const Management: React.FC<ManagementProps> = ({
                                                                 <span className={`px-1.5 py-0.5 rounded ${game.location === 'Home' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                                     {game.location}
                                                                 </span>
-                                                                <span className="text-gray-400 font-medium">
+                                                                <span className="text-gray-500 font-medium">
                                                                     {sports.find(s => s.id === game.sportId)?.name}
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => { handleEditGame(game); setShowDayDetails(false); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-3 h-3" /></button>
-                                                            <button onClick={() => { if (window.confirm('Delete?')) onDeleteGame(game.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3" /></button>
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                                            <button type="button" aria-label={`Edit game vs ${game.opponent}`} onClick={() => { handleEditGame(game); setShowDayDetails(false); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="w-3 h-3" /></button>
+                                                            <button type="button" aria-label={`Delete game vs ${game.opponent}`} onClick={() => { if (window.confirm('Delete?')) onDeleteGame(game.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3" /></button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -539,14 +539,15 @@ export const Management: React.FC<ManagementProps> = ({
                         {/* Add/Edit Game Modal (Previously existing) */}
                         {showGameModal && (
                             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                                <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                                <div role="dialog" aria-modal="true" aria-label={editingId ? 'Edit game' : 'Add new game'} className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="font-bold text-lg text-[#154734]">{editingId ? 'Edit Game' : 'Add New Game'}</h3>
-                                        <button onClick={resetGameForm} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                                        <button type="button" aria-label="Close" onClick={resetGameForm} className="text-gray-500 hover:text-gray-600"><X className="w-5 h-5" /></button>
                                     </div>
 
                                     <div className="space-y-3">
                                         <select
+                                            aria-label="Sport"
                                             value={gameForm.sportId}
                                             onChange={e => setGameForm({ ...gameForm, sportId: e.target.value })}
                                             className="w-full border p-2 rounded focus:ring-2 focus:ring-[#154734] outline-none"
@@ -555,13 +556,14 @@ export const Management: React.FC<ManagementProps> = ({
                                         </select>
 
                                         <div className="flex gap-2">
-                                            <input type="date" value={gameForm.date} onChange={e => setGameForm({ ...gameForm, date: e.target.value })} className="border p-2 rounded flex-1 focus:ring-2 focus:ring-[#154734] outline-none" />
-                                            <input type="time" value={gameForm.time} onChange={e => setGameForm({ ...gameForm, time: e.target.value })} className="border p-2 rounded w-32 focus:ring-2 focus:ring-[#154734] outline-none" />
+                                            <input type="date" aria-label="Game date" value={gameForm.date} onChange={e => setGameForm({ ...gameForm, date: e.target.value })} className="border p-2 rounded flex-1 focus:ring-2 focus:ring-[#154734] outline-none" />
+                                            <input type="time" aria-label="Game time" value={gameForm.time} onChange={e => setGameForm({ ...gameForm, time: e.target.value })} className="border p-2 rounded w-32 focus:ring-2 focus:ring-[#154734] outline-none" />
                                         </div>
 
                                         <div className="flex items-center gap-2 border p-2 rounded bg-gray-50">
                                             <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Time Zone</span>
                                             <select
+                                                aria-label="Time zone"
                                                 value={gameForm.timeZone}
                                                 onChange={e => setGameForm({ ...gameForm, timeZone: e.target.value })}
                                                 className="bg-transparent text-sm w-full outline-none font-medium text-gray-700"
@@ -575,10 +577,10 @@ export const Management: React.FC<ManagementProps> = ({
                                             </select>
                                         </div>
 
-                                        <input type="text" placeholder="Opponent" value={gameForm.opponent} onChange={e => setGameForm({ ...gameForm, opponent: e.target.value })} className="w-full border p-2 rounded focus:ring-2 focus:ring-[#154734] outline-none" />
+                                        <input type="text" aria-label="Opponent" placeholder="Opponent" value={gameForm.opponent} onChange={e => setGameForm({ ...gameForm, opponent: e.target.value })} className="w-full border p-2 rounded focus:ring-2 focus:ring-[#154734] outline-none" />
 
                                         <div className="flex gap-2">
-                                            <select value={gameForm.location} onChange={e => setGameForm({ ...gameForm, location: e.target.value as any })} className="border p-2 rounded flex-1 focus:ring-2 focus:ring-[#154734] outline-none">
+                                            <select aria-label="Location" value={gameForm.location} onChange={e => setGameForm({ ...gameForm, location: e.target.value as any })} className="border p-2 rounded flex-1 focus:ring-2 focus:ring-[#154734] outline-none">
                                                 <option value="Home">Home</option>
                                                 <option value="Away">Away</option>
                                                 <option value="Neutral">Neutral</option>
@@ -601,7 +603,7 @@ export const Management: React.FC<ManagementProps> = ({
                                             Worth {gamePointValue({ isBonus: gameForm.isBonus })} point{gameForm.isBonus ? 's' : ''}. Every game is 1 point, bonus games are 2.
                                         </p>
 
-                                        <textarea placeholder="Notes / Description" value={gameForm.description} onChange={e => setGameForm({ ...gameForm, description: e.target.value })} className="w-full border p-2 rounded text-sm h-20 focus:ring-2 focus:ring-[#154734] outline-none"></textarea>
+                                        <textarea aria-label="Notes or description" placeholder="Notes / Description" value={gameForm.description} onChange={e => setGameForm({ ...gameForm, description: e.target.value })} className="w-full border p-2 rounded text-sm h-20 focus:ring-2 focus:ring-[#154734] outline-none"></textarea>
 
                                         <div className="flex gap-3 pt-2">
                                             <button onClick={handleSaveGame} className="flex-1 bg-[#154734] text-white py-2.5 rounded-lg font-bold hover:shadow-lg transition-transform active:scale-95">Save Game</button>
@@ -641,9 +643,9 @@ export const Management: React.FC<ManagementProps> = ({
                         {editingId && (
                         <div className="p-4 rounded-lg border flex flex-wrap gap-3 items-end shrink-0 bg-yellow-50 border-yellow-200">
                             <span className="text-xs font-bold text-yellow-800 w-full">Editing member</span>
-                            <input type="text" value={memberForm.firstName} onChange={e => setMemberForm({ ...memberForm, firstName: e.target.value })} placeholder="First" className="border p-2 rounded text-sm w-32" />
-                            <input type="text" value={memberForm.lastName} onChange={e => setMemberForm({ ...memberForm, lastName: e.target.value })} placeholder="Last" className="border p-2 rounded text-sm w-32" />
-                            <select value={memberForm.role} onChange={e => setMemberForm({ ...memberForm, role: e.target.value as Role })} className="border p-2 rounded text-sm">
+                            <input type="text" aria-label="First name" value={memberForm.firstName} onChange={e => setMemberForm({ ...memberForm, firstName: e.target.value })} placeholder="First" className="border p-2 rounded text-sm w-32" />
+                            <input type="text" aria-label="Last name" value={memberForm.lastName} onChange={e => setMemberForm({ ...memberForm, lastName: e.target.value })} placeholder="Last" className="border p-2 rounded text-sm w-32" />
+                            <select aria-label="Member role" value={memberForm.role} onChange={e => setMemberForm({ ...memberForm, role: e.target.value as Role })} className="border p-2 rounded text-sm">
                                 <option value={Role.ADMIN}>Admin</option>
                                 <option value={Role.OFFICER}>Officer</option>
                                 <option value={Role.MEMBER}>Member</option>
@@ -651,7 +653,7 @@ export const Management: React.FC<ManagementProps> = ({
                                 <option value={Role.INACTIVE}>Inactive</option>
                             </select>
                             <button onClick={handleSaveMember} className="bg-[#154734] text-white px-4 py-2 rounded text-sm font-bold">Save</button>
-                            <button onClick={resetMemberForm} className="bg-gray-200 px-3 py-2 rounded"><X className="w-4 h-4" /></button>
+                            <button type="button" aria-label="Cancel editing member" onClick={resetMemberForm} className="bg-gray-200 px-3 py-2 rounded"><X className="w-4 h-4" /></button>
                         </div>
                         )}
 
@@ -775,8 +777,8 @@ export const Management: React.FC<ManagementProps> = ({
                                             </td>
                                             <td className="px-4 py-3">{m.role}</td>
                                             <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                                <button onClick={() => handleEditMember(m)} className="text-gray-500 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
-                                                <button onClick={() => { if (window.confirm('Delete?')) onDeleteMember(m.id) }} className="text-gray-500 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                                                <button type="button" aria-label={`Edit ${m.firstName} ${m.lastName}`} onClick={() => handleEditMember(m)} className="text-gray-500 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
+                                                <button type="button" aria-label={`Delete ${m.firstName} ${m.lastName}`} onClick={() => { if (window.confirm('Delete?')) onDeleteMember(m.id) }} className="text-gray-500 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                                             </td>
                                         </tr>
                                     ))}
@@ -797,6 +799,7 @@ export const Management: React.FC<ManagementProps> = ({
                                 <div>
                                     <label className="text-xs font-bold text-gray-500">Member</label>
                                     <select
+                                        aria-label="Member"
                                         className="w-full border p-2 rounded"
                                         value={selectedMemberId}
                                         onChange={e => setSelectedMemberId(e.target.value)}
@@ -823,6 +826,7 @@ export const Management: React.FC<ManagementProps> = ({
                                     <label className="text-xs font-bold text-gray-500">Points (+/-)</label>
                                     <input
                                         type="number"
+                                        aria-label="Points (+/-)"
                                         className="w-full border p-2 rounded"
                                         value={manualPoints}
                                         onChange={e => setManualPoints(Number(e.target.value))}
@@ -833,6 +837,7 @@ export const Management: React.FC<ManagementProps> = ({
                                     <label className="text-xs font-bold text-gray-500">Reason</label>
                                     <input
                                         type="text"
+                                        aria-label="Reason"
                                         className="w-full border p-2 rounded"
                                         value={pointsReason}
                                         onChange={e => setPointsReason(e.target.value)}
@@ -946,7 +951,7 @@ export const Management: React.FC<ManagementProps> = ({
                                                     {bp.points > 0 ? '+' : ''}{bp.points}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <button onClick={() => onDeleteBonusPoint(bp.id)} className="text-gray-400 hover:text-red-500">
+                                                    <button type="button" aria-label="Delete point adjustment" onClick={() => onDeleteBonusPoint(bp.id)} className="text-gray-500 hover:text-red-500">
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </td>
@@ -954,7 +959,7 @@ export const Management: React.FC<ManagementProps> = ({
                                         );
                                     }) : (
                                         <tr>
-                                            <td colSpan={6} className="p-8 text-center text-gray-400 italic">No manual point adjustments recorded.</td>
+                                            <td colSpan={6} className="p-8 text-center text-gray-500 italic">No manual point adjustments recorded.</td>
                                         </tr>
                                     )}
                                 </tbody>

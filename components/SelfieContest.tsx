@@ -91,6 +91,7 @@ export const SelfieContest: React.FC<SelfieContestProps> = ({ data, currentMembe
                 {gamesWithSelfies.length > 1 && (
                     <div className="relative min-w-[200px]">
                         <select
+                            aria-label="Select game for selfie contest"
                             value={contestGame.id}
                             onChange={(e) => setSelectedGameId(e.target.value)}
                             className="appearance-none w-full bg-white border-2 border-gray-100 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-[#154734]/20 transition-all cursor-pointer shadow-sm pr-10"
@@ -172,6 +173,7 @@ export const SelfieContest: React.FC<SelfieContestProps> = ({ data, currentMembe
                                         onClick={() => handleDownload(selfie)}
                                         className="p-2 bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#154734] rounded-full transition-all"
                                         title="Download Selfie"
+                                        aria-label="Download selfie"
                                     >
                                         <Download className="w-4 h-4" />
                                     </button>

@@ -87,13 +87,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" className="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden">
                 <div className="bg-[#154734] p-4 flex justify-between items-center text-white">
-                    <h3 className="font-bold flex items-center gap-2">
+                    <h3 id="settings-modal-title" className="font-bold flex items-center gap-2">
                         <Lock className="w-4 h-4" />
                         {adminMode ? `Edit Profile: ${member.firstName}` : 'Profile & Settings'}
                     </h3>
-                    <button onClick={onClose} className="hover:bg-white/10 rounded-full p-1 transition-colors"><X className="w-5 h-5" /></button>
+                    <button type="button" onClick={onClose} aria-label="Close" className="hover:bg-white/10 rounded-full p-1 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
 
                 {localSuccess ? (
@@ -108,11 +108,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
                             <div className="space-y-4">
                                 <h3 className="font-bold text-gray-900 border-b pb-2 flex items-center justify-between">
                                     <span>Profile Details</span>
-                                    <span className="text-[10px] uppercase text-gray-400 font-normal">ID: {member.id}</span>
+                                    <span className="text-[10px] uppercase text-gray-500 font-normal">ID: {member.id}</span>
                                 </h3>
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">Baylor Email</label>
+                                    <label htmlFor="settings-email" className="block text-sm font-bold text-gray-700 mb-1">Baylor Email</label>
                                     <input
+                                        id="settings-email"
                                         type="email"
                                         value={email}
                                         onChange={e => setEmail(e.target.value)}
@@ -124,15 +125,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">Fall Sport</label>
-                                        <select value={fallSportId} onChange={e => setFallSportId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-white">
+                                        <label htmlFor="settings-fall-sport" className="block text-sm font-bold text-gray-700 mb-1">Fall Sport</label>
+                                        <select id="settings-fall-sport" value={fallSportId} onChange={e => setFallSportId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-white">
                                             <option value="">-- None --</option>
                                             {eligibleSports.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">Spring Sport</label>
-                                        <select value={springSportId} onChange={e => setSpringSportId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-white">
+                                        <label htmlFor="settings-spring-sport" className="block text-sm font-bold text-gray-700 mb-1">Spring Sport</label>
+                                        <select id="settings-spring-sport" value={springSportId} onChange={e => setSpringSportId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-white">
                                             <option value="">-- None --</option>
                                             {eligibleSports.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                         </select>
@@ -149,8 +150,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
                             <div className="space-y-4 pt-4 border-t border-gray-100">
                                 <h3 className="font-bold text-gray-900">Change Password (Optional)</h3>
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">New Password</label>
+                                    <label htmlFor="settings-new-password" className="block text-sm font-bold text-gray-700 mb-1">New Password</label>
                                     <input
+                                        id="settings-new-password"
                                         type="password"
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
@@ -161,8 +163,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, m
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">Confirm Password</label>
+                                    <label htmlFor="settings-confirm-password" className="block text-sm font-bold text-gray-700 mb-1">Confirm Password</label>
                                     <input
+                                        id="settings-confirm-password"
                                         type="password"
                                         value={confirm}
                                         onChange={(e) => setConfirm(e.target.value)}
