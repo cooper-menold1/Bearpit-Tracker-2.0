@@ -74,6 +74,34 @@ function parseCalendarPayload(contents: any): ScrapedGame[] {
   return games.filter((g) => g.opponent && g.opponent.toLowerCase() !== "baylor");
 }
 
+const normTime = (t?: string | null): string => {
+  const v = (t || "").trim().toLowerCase().replace(/\s+/g, "").replace(/\./g, "");
+  return v === "tba" || v === "tbd" ? "" : v;
+};
+
+// Match scraped games to existing by sport + date + start time (keeps doubleheaders separate).
+// Passes (each existing game claimed once): same time; same opponent; lone leftover on that sport/day.
+// Keep in sync with matchGamesToExisting in utils/scraper.ts.
+function matchGames(queries: { sportKey?: string; date: string; time?: string; opponent: string }[], existing: any[]): (string | null)[] {
+  const result: (string | null)[] = queries.map(() => null);
+  const claimed = new Set<string>();
+  const cands = (q: any) => existing.filter((e) => !claimed.has(e.id) && e.date === q.date && e.sport_id === q.sportKey);
+  const run = (pick: (q: any, c: any[]) => any) => {
+    queries.forEach((q, i) => {
+      if (result[i] || !q.sportKey) return;
+      const m = pick(q, cands(q));
+      if (m) { result[i] = m.id; claimed.add(m.id); }
+    });
+  };
+  run((q, c) => { const t = normTime(q.time); return t ? c.find((e) => normTime(e.time) === t) : undefined; });
+  run((q, c) => c.find((e) => String(e.opponent).toLowerCase() === q.opponent.toLowerCase()));
+  run((q, c) => {
+    const n = queries.filter((o, j) => !result[j] && o.sportKey === q.sportKey && o.date === q.date).length;
+    return c.length === 1 && n === 1 ? c[0] : undefined;
+  });
+  return result;
+}
+
 async function fetchMonth(year: number, month: number, log: string[]): Promise<ScrapedGame[]> {
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
@@ -147,16 +175,23 @@ Deno.serve(async () => {
     let updated = 0;
     let skippedUnknownSport = 0;
 
-    for (const g of scraped) {
-      const sport = sports.find((s: any) => s.name.toLowerCase() === g.sportName.toLowerCase())
+    const sportFor = (g: ScrapedGame) =>
+      sports.find((s: any) => s.name.toLowerCase() === g.sportName.toLowerCase())
         ?? sports.find((s: any) => g.sportName.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(g.sportName.toLowerCase()));
+    const matchedIds = matchGames(
+      scraped.map((g) => ({ sportKey: sportFor(g)?.id, date: g.date, time: g.time, opponent: g.opponent })),
+      existingGames ?? [],
+    );
+
+    for (const [gi, g] of scraped.entries()) {
+      const sport = sportFor(g);
 
       if (!sport) {
         skippedUnknownSport++;
         continue;
       }
 
-      const existing = (existingGames ?? []).find((ex: any) => ex.date === g.date && ex.sport_id === sport.id);
+      const existing = matchedIds[gi] ? (existingGames ?? []).find((ex: any) => ex.id === matchedIds[gi]) : undefined;
 
       if (existing) {
         const same = existing.opponent.toLowerCase() === g.opponent.toLowerCase()
@@ -176,7 +211,11 @@ Deno.serve(async () => {
         continue;
       }
 
-      const id = "autofill_" + sport.id + "_" + g.date;
+      let id = "autofill_" + sport.id + "_" + g.date;
+      if ((existingGames ?? []).some((ex: any) => ex.id === id)) {
+        // Second game of a doubleheader: disambiguate the id so it does not overwrite the first.
+        id += "_" + (normTime(g.time) || g.opponent.toLowerCase()).replace(/[^a-z0-9]+/g, "");
+      }
       const { error: gameErr } = await supabase.from("games").insert({
         id,
         sport_id: sport.id,

@@ -684,7 +684,7 @@ function App() {
             <Instructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} sheetUrl="" onSaveUrl={() => { }} onSaveSettings={() => { }} />
             <Suspense fallback={null}>
                 {currentMember && (
-                    <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} currentMember={currentMember} selfieVotes={data.selfieVotes} />
+                    <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} bonusPoints={data.bonusPoints} currentMember={currentMember} selfieVotes={data.selfieVotes} />
                 )}
                 <SportsManager isOpen={showSportsManager} onClose={() => setShowSportsManager(false)} sports={data.sports} games={data.games} onAddSport={handleAddSport} onDeleteSport={handleDeleteSport} onUpdateSportVenues={async (id, vids) => await supabase.from('sports').update({ venue_ids: vids }).eq('id', id)} />
                 <ChantManager isOpen={showChantManager} onClose={() => setShowChantManager(false)} />
