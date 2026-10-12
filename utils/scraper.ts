@@ -134,3 +134,39 @@ export const resolveSportMappings = (scrapedGames: ScrapedGame[], existingSports
 
     return mappings;
 };
+
+const normTime = (t?: string | null): string => {
+    const v = (t || '').trim().toLowerCase().replace(/\s+/g, '').replace(/\./g, '');
+    return v === 'tba' || v === 'tbd' ? '' : v;
+};
+
+export interface SlotCandidate { id: string; sportKey: string; date: string; time?: string | null; opponent: string; }
+export interface SlotQuery { sportKey: string | undefined; date: string; time?: string | null; opponent: string; }
+
+/**
+ * Match scraped games to existing games by sport + date + start time, so doubleheaders
+ * stay separate. Passes (each existing game is claimed at most once):
+ *  1. same start time; 2. same opponent (covers TBA/missing or changed times);
+ *  3. the lone leftover game on that sport/day (opponent/time changed).
+ * Returns the matched existing id (or null) for each query, in order.
+ * Keep in sync with matchGames in supabase/functions/autofill-schedule/index.ts.
+ */
+export const matchGamesToExisting = (queries: SlotQuery[], existing: SlotCandidate[]): (string | null)[] => {
+    const result: (string | null)[] = queries.map(() => null);
+    const claimed = new Set<string>();
+    const cands = (q: SlotQuery) => existing.filter(e => !claimed.has(e.id) && e.date === q.date && e.sportKey === q.sportKey);
+    const run = (pick: (q: SlotQuery, c: SlotCandidate[]) => SlotCandidate | undefined) => {
+        queries.forEach((q, i) => {
+            if (result[i] || !q.sportKey) return;
+            const m = pick(q, cands(q));
+            if (m) { result[i] = m.id; claimed.add(m.id); }
+        });
+    };
+    run((q, c) => { const t = normTime(q.time); return t ? c.find(e => normTime(e.time) === t) : undefined; });
+    run((q, c) => c.find(e => e.opponent.toLowerCase() === q.opponent.toLowerCase()));
+    run((q, c) => {
+        const n = queries.filter((o, j) => !result[j] && o.sportKey === q.sportKey && o.date === q.date).length;
+        return c.length === 1 && n === 1 ? c[0] : undefined;
+    });
+    return result;
+};

@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Check, AlertCircle, Loader2, Calendar as CalendarIcon, Info, Trophy, ChevronRight, Plus, MapPin, Clock } from 'lucide-react';
 import { Game, Sport, Role } from '../types';
-import { fetchSchedule, ScrapedGame, resolveSportMappings } from '../utils/scraper';
+import { fetchSchedule, ScrapedGame, resolveSportMappings, matchGamesToExisting } from '../utils/scraper';
 import { parseLocalDate, formatLocalDate, todayInChicago, addDaysToDateStr } from '../utils/dateUtils';
+
+// Match by sport + date + start time (opponent fallback), so doubleheaders stay separate.
+const matchScraped = (games: ScrapedGame[], mappings: Record<string, { sportId?: string }>, existing: Game[]) =>
+    matchGamesToExisting(
+        games.map(g => ({ sportKey: mappings[g.sportName]?.sportId, date: g.date, time: g.time, opponent: g.opponent })),
+        existing.map(e => ({ id: e.id, sportKey: e.sportId, date: e.date, time: e.time, opponent: e.opponent }))
+    );
 
 interface AutoFillModalProps {
     isOpen: boolean;
@@ -69,9 +76,9 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                 const toSelect = new Set<number>();
                 const statuses: Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string }> = {};
 
+                const matchedIds = matchScraped(games, initialMappings, existingGames);
                 games.forEach((g, idx) => {
-                    const sportId = initialMappings[g.sportName]?.sportId;
-                    const existing = existingGames.find(ex => ex.date === g.date && ex.sportId === sportId);
+                    const existing = matchedIds[idx] ? existingGames.find(ex => ex.id === matchedIds[idx]) : undefined;
 
                     if (!existing) {
                         statuses[idx] = { status: 'new' };
@@ -176,6 +183,8 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                 const status = gameStatuses[idx];
                 const sportId = finalMappings[g.sportName]?.sportId;
                 if (!sportId) continue;
+                // Updates upsert the whole row, so carry over the existing bonus settings.
+                const prior = status.existingGameId ? existingGames.find(ex => ex.id === status.existingGameId) : undefined;
 
                 onAddGame({
                     id: status.existingGameId || `scraped_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -184,8 +193,8 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                     time: g.time,
                     opponent: g.opponent,
                     location: g.location,
-                    isBonus: false,
-                    pointsValue: 1,
+                    isBonus: prior ? prior.isBonus : false,
+                    pointsValue: prior ? prior.pointsValue : 1,
                     description: g.description
                 });
             }
@@ -411,9 +420,9 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                     const toSelect = new Set<number>();
                                     const statuses: Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string }> = {};
 
+                                    const matchedIds = matchScraped(scrapedGames, sportMappings, existingGames);
                                     scrapedGames.forEach((g, idx) => {
-                                        const sportId = sportMappings[g.sportName]?.sportId;
-                                        const existing = existingGames.find(ex => ex.date === g.date && ex.sportId === sportId);
+                                        const existing = matchedIds[idx] ? existingGames.find(ex => ex.id === matchedIds[idx]) : undefined;
 
                                         if (!existing) {
                                             statuses[idx] = { status: 'new' };
