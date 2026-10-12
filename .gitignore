@@ -26,3 +26,12 @@ dist-ssr
 # Claude Code personal settings
 .claude/settings.local.json
 review-screenshots/
+
+# Secrets / local tooling
+.env.local
+.env.*.local
+supabase/.temp/
+supabase/.branches/
+*.pem
+*.key
+serviceAccount*.json
