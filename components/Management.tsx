@@ -446,8 +446,6 @@ export const Management: React.FC<ManagementProps> = ({
                             games={games}
                             sports={sports}
                             onDayClick={handleDayClick}
-                            onEditGame={handleEditGame}
-                            onDeleteGame={(id) => { if (window.confirm('Delete game?')) onDeleteGame(id); }}
                             headerActions={
                                 <>
                                     <button
