@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Member, Game, Sport } from '../types';
+import { PrivacyLink } from './PrivacyPolicy';
 import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { VENUES } from '../constants';
 import { todayInChicago } from '../utils/dateUtils';
@@ -247,6 +248,9 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                 </div>
                             </div>
 
+                            <p className="text-xs text-gray-500 mb-2">
+                                Your location is shared when you check in so officers can confirm you were at the venue. See our <PrivacyLink className="text-[#154734]" />.
+                            </p>
                             {/* Verification Hint */}
                             <div className="bg-blue-50 border-blue-100 p-3 rounded-lg border flex items-start gap-2 mb-2">
                                 <div className="text-[#154734] mt-0.5"><MapPin className="w-4 h-4" /></div>
