@@ -5,6 +5,7 @@ import { Music, QrCode, User, UserPlus, X } from 'lucide-react';
 import LOGO_V2 from '../assets/bearpit_logo_full_color.png';
 import { supabase } from '../utils/supabaseClient';
 import { NEXT_INTEREST_MEETING } from '../constants';
+import { PrivacyLink } from './PrivacyPolicy';
 
 const CONFETTI_EMOJI = ['🏀', '🏈', '⚾', '🏐', '🎾', '⚽'];
 
@@ -206,6 +207,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                 </div>
                 <div className="bg-[#0a2319] w-full py-12 text-center text-white/20 text-sm border-t border-white/5">
                     <p>&copy; {new Date().getFullYear()} Baylor BearPit. All rights reserved.</p>
+                    <p className="mt-2 text-white/50"><PrivacyLink /></p>
                 </div>
             </div>
 

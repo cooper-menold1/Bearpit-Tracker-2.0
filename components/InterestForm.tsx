@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Member, Role } from '../types';
 import { CheckCircle2, ArrowLeft, UserPlus, AlertTriangle } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
+import { PrivacyLink } from './PrivacyPolicy';
 
 interface InterestFormProps {
     members: Member[];
@@ -247,6 +248,10 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                             <span>{submitError}</span>
                         </div>
                     )}
+
+                    <p className="text-xs text-gray-500">
+                        We collect your name and contact info to add you to the BearPit member list and track points. See our <PrivacyLink className="text-[#154734]" />.
+                    </p>
 
                     <button
                         type="submit"
