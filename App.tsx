@@ -528,7 +528,13 @@ function App() {
         if (signupError) {
             // Don't leave points behind for a slot that was never claimed.
             await supabase.from('bonus_points').delete().eq('id', bp.id);
-            pointsWriteFailed('Signing up', signupError);
+            // The DB slot-limit trigger (20261012_event_signup_slot_limit.sql)
+            // raises 'event_full' when someone else grabbed the last slot first.
+            if (/event_full/i.test(signupError.message || '')) {
+                alert('Sorry, this event just filled up. Someone else took the last slot.');
+            } else {
+                pointsWriteFailed('Signing up', signupError);
+            }
         }
         await fetchCoreData();
     };
