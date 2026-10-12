@@ -294,7 +294,6 @@ export const Management: React.FC<ManagementProps> = ({
                 lastName: memberForm.lastName,
                 role: memberForm.role as Role,
                 yearsInBPLT: memberForm.yearsInBPLT || 0,
-                password: 'BPLT', // Default password for new members
                 email: memberForm.email || '',
                 fallSportId: memberForm.fallSportId || '',
                 springSportId: memberForm.springSportId || '',
