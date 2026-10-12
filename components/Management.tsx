@@ -10,53 +10,7 @@ import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
 import { BugLog } from './BugLog';
 import { gamePointValue } from '../utils/fanTier';
-import { parseLocalDate } from '../utils/dateUtils';
-
-// Inline helper to avoid import issues
-const convertInputToCST = (dateStr: string, timeStr: string, sourceTimeZone: string): { date: string, time: string } => {
-    if (!dateStr || !timeStr) return { date: dateStr, time: timeStr };
-
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const [hours, minutes] = timeStr.split(':').map(Number);
-
-    let estimated = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-
-    const getPartsInZone = (d: Date, zone: string) => {
-        const fmt = new Intl.DateTimeFormat('en-US', {
-            timeZone: zone,
-            year: 'numeric', month: 'numeric', day: 'numeric',
-            hour: 'numeric', minute: 'numeric', second: 'numeric',
-            hour12: false
-        });
-        const parts = fmt.formatToParts(d);
-        const part = (type: string) => Number(parts.find(p => p.type === type)?.value);
-        let h = part('hour');
-        if (h === 24) h = 0;
-        return {
-            y: part('year'),
-            m: part('month'),
-            d: part('day'),
-            h: h,
-            min: part('minute')
-        };
-    };
-
-    for (let i = 0; i < 3; i++) {
-        const currentParts = getPartsInZone(estimated, sourceTimeZone);
-        const currentAsUTC = Date.UTC(currentParts.y, currentParts.m - 1, currentParts.d, currentParts.h, currentParts.min);
-        const targetAsUTC = Date.UTC(year, month - 1, day, hours, minutes);
-        const diff = targetAsUTC - currentAsUTC;
-        if (Math.abs(diff) < 1000) break;
-        estimated = new Date(estimated.getTime() + diff);
-    }
-
-    const cstParts = getPartsInZone(estimated, 'America/Chicago');
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return {
-        date: `${cstParts.y}-${pad(cstParts.m)}-${pad(cstParts.d)}`,
-        time: `${pad(cstParts.h)}:${pad(cstParts.min)}`
-    };
-};
+import { parseLocalDate, convertInputToCST } from '../utils/dateUtils';
 
 interface ManagementProps {
     members: Member[];
