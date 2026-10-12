@@ -128,6 +128,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                 <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
                     <CalendarRange className="w-4 h-4 text-gray-500" />
                     <select
+                        aria-label="Semester"
                         value={semesterKey}
                         onChange={(e) => setSemesterKey(e.target.value)}
                         className="bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#154734] outline-none"
@@ -140,6 +141,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                         <>
                             <Filter className="w-4 h-4 text-gray-500" />
                             <select
+                                aria-label="Filter by sport"
                                 value={filterSportId}
                                 onChange={(e) => setFilterSportId(e.target.value)}
                                 className="bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#154734] outline-none"

@@ -585,7 +585,7 @@ export const Management: React.FC<ManagementProps> = ({
                                                 <option value="Away">Away</option>
                                                 <option value="Neutral">Neutral</option>
                                             </select>
-                                            <div className="flex items-center gap-2 border p-2 rounded px-3 cursor-pointer hover:bg-gray-50" onClick={() => setGameForm({ ...gameForm, isBonus: !gameForm.isBonus })}>
+                                            <div role="checkbox" aria-checked={gameForm.isBonus} aria-label="Bonus game" tabIndex={0} onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setGameForm({ ...gameForm, isBonus: !gameForm.isBonus }); } }} className="flex items-center gap-2 border p-2 rounded px-3 cursor-pointer hover:bg-gray-50" onClick={() => setGameForm({ ...gameForm, isBonus: !gameForm.isBonus })}>
                                                 <div className={`w-4 h-4 rounded border flex items-center justify-center ${gameForm.isBonus ? 'bg-[#FFB81C] border-[#FFB81C]' : 'border-gray-300'}`}>
                                                     {gameForm.isBonus && <Trophy className="w-3 h-3 text-[white]" />}
                                                 </div>

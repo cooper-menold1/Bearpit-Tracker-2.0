@@ -101,7 +101,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                     <div className="p-6 border-t border-gray-100 space-y-4">
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Subject</label>
-                            <input
+                            <input aria-label="Email subject"
                                 type="text"
                                 value={form.subject}
                                 onChange={e => setForm({ ...form, subject: e.target.value })}
@@ -111,7 +111,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
 
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Body</label>
-                            <textarea
+                            <textarea aria-label="Email body"
                                 value={form.body}
                                 onChange={e => setForm({ ...form, body: e.target.value })}
                                 rows={12}
@@ -129,7 +129,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Meeting Type</label>
-                                <select
+                                <select aria-label="Meeting type"
                                     value={form.meetingType || 'interest session'}
                                     onChange={e => setForm({ ...form, meetingType: e.target.value })}
                                     className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white outline-none"
@@ -140,7 +140,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Date</label>
-                                <input
+                                <input aria-label="Meeting date"
                                     type="date"
                                     value={form.meetingDate || ''}
                                     onChange={e => setForm({ ...form, meetingDate: e.target.value })}
@@ -149,7 +149,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Time</label>
-                                <input
+                                <input aria-label="Meeting time"
                                     type="text"
                                     placeholder="6:30 PM"
                                     value={form.meetingTime || ''}
@@ -159,7 +159,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Location</label>
-                                <input
+                                <input aria-label="Meeting location"
                                     type="text"
                                     placeholder="Foster 240"
                                     value={form.meetingLocation || ''}

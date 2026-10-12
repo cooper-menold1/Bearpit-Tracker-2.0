@@ -203,7 +203,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div role="dialog" aria-modal="true" aria-label="Auto-fill games" className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="bg-[#154734] p-6 text-white flex justify-between items-center shrink-0">
                     <div>
@@ -213,7 +213,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                         </h2>
                         <p className="text-white/70 text-sm mt-1">Automatically find and add games from baylorbears.com</p>
                     </div>
-                    <button onClick={onClose} className="text-white/50 hover:text-white transition-colors">
+                    <button type="button" aria-label="Close" onClick={onClose} className="text-white/70 hover:text-white transition-colors">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -248,7 +248,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                             </div>
 
                             <div className="flex gap-4 max-w-xs mx-auto">
-                                <select
+                                <select aria-label="Month"
                                     value={month}
                                     onChange={(e) => setMonth(Number(e.target.value))}
                                     className="flex-1 border-2 border-gray-200 rounded-xl p-3 font-bold focus:border-[#154734] outline-none transition-colors"
@@ -259,7 +259,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                         </option>
                                     ))}
                                 </select>
-                                <select
+                                <select aria-label="Year"
                                     value={year}
                                     onChange={(e) => setYear(Number(e.target.value))}
                                     className="w-32 border-2 border-gray-200 rounded-xl p-3 font-bold focus:border-[#154734] outline-none transition-colors"
@@ -293,7 +293,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Start Date</label>
-                                    <input 
+                                    <input aria-label="Start date" 
                                         type="date" 
                                         value={meetingConfig.startDate}
                                         onChange={(e) => setMeetingConfig({...meetingConfig, startDate: e.target.value})}
@@ -302,7 +302,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                 </div>
                                 <div className="space-y-1">
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">End Date</label>
-                                    <input 
+                                    <input aria-label="End date" 
                                         type="date" 
                                         value={meetingConfig.endDate}
                                         onChange={(e) => setMeetingConfig({...meetingConfig, endDate: e.target.value})}
@@ -316,7 +316,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Meeting Time</label>
                                     <div className="relative">
                                         <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                        <input 
+                                        <input aria-label="Meeting time" 
                                             type="time" 
                                             value={meetingConfig.time}
                                             onChange={(e) => setMeetingConfig({...meetingConfig, time: e.target.value})}
@@ -326,7 +326,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                 </div>
                                 <div className="space-y-1">
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Day of Week</label>
-                                    <select 
+                                    <select aria-label="Day of week" 
                                         value={meetingConfig.dayOfWeek}
                                         onChange={(e) => setMeetingConfig({...meetingConfig, dayOfWeek: Number(e.target.value)})}
                                         className="w-full border-2 border-gray-100 rounded-xl p-3 text-sm font-bold focus:border-[#154734] outline-none transition-all"
@@ -375,7 +375,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                         </div>
 
                                         <div className="flex items-center gap-2">
-                                            <select
+                                            <select aria-label="Sport for meeting"
                                                 className="text-sm border rounded-lg p-2 outline-none focus:ring-2 focus:ring-[#154734]"
                                                 value={mapping.status === 'ignore' ? 'ignore' : (mapping.sportId || 'new')}
                                                 onChange={(e) => {

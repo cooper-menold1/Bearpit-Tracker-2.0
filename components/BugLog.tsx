@@ -94,6 +94,7 @@ export const BugLog: React.FC = () => {
                     Jot down anything broken you hear about or run into. Only the description is required.
                 </p>
                 <textarea
+                    aria-label="Bug description"
                     className="w-full border p-2 rounded mb-3"
                     rows={3}
                     value={form.description}
@@ -103,18 +104,18 @@ export const BugLog: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="text-xs font-bold text-gray-500">Where on the site</label>
-                        <select className="w-full border p-2 rounded" value={form.page} onChange={e => setForm(f => ({ ...f, page: e.target.value }))}>
+                        <select aria-label="Where on the site" className="w-full border p-2 rounded" value={form.page} onChange={e => setForm(f => ({ ...f, page: e.target.value }))}>
                             <option value="">Not sure</option>
                             {PAGES.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="text-xs font-bold text-gray-500">Reported by</label>
-                        <input type="text" className="w-full border p-2 rounded" value={form.reportedBy} onChange={e => setForm(f => ({ ...f, reportedBy: e.target.value }))} placeholder="Optional" />
+                        <input type="text" aria-label="Reported by" className="w-full border p-2 rounded" value={form.reportedBy} onChange={e => setForm(f => ({ ...f, reportedBy: e.target.value }))} placeholder="Optional" />
                     </div>
                     <div>
                         <label className="text-xs font-bold text-gray-500">Priority</label>
-                        <select className="w-full border p-2 rounded" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                        <select aria-label="Priority" className="w-full border p-2 rounded" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
                             {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </div>
@@ -142,7 +143,7 @@ export const BugLog: React.FC = () => {
                         Couldn't load the bug log: {loadError}
                     </div>
                 ) : shown.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400 italic">{showFixed ? 'Nothing fixed yet.' : 'No open bugs.'}</div>
+                    <div className="p-8 text-center text-gray-500 italic">{showFixed ? 'Nothing fixed yet.' : 'No open bugs.'}</div>
                 ) : (
                     <ul className="divide-y divide-gray-100">
                         {shown.map(bug => (
@@ -158,15 +159,15 @@ export const BugLog: React.FC = () => {
                                     </div>
                                 </div>
                                 {bug.status === 'Fixed' ? (
-                                    <button onClick={() => setStatus(bug, 'Open')} title="Reopen" className="text-gray-400 hover:text-[#154734]">
+                                    <button type="button" onClick={() => setStatus(bug, 'Open')} title="Reopen" aria-label="Reopen bug" className="text-gray-500 hover:text-[#154734]">
                                         <RotateCcw className="w-4 h-4" />
                                     </button>
                                 ) : (
-                                    <button onClick={() => setStatus(bug, 'Fixed')} title="Mark fixed" className="text-gray-400 hover:text-green-600">
+                                    <button type="button" onClick={() => setStatus(bug, 'Fixed')} title="Mark fixed" aria-label="Mark bug fixed" className="text-gray-500 hover:text-green-600">
                                         <Check className="w-5 h-5" />
                                     </button>
                                 )}
-                                <button onClick={() => handleDelete(bug)} title="Delete" className="text-gray-400 hover:text-red-500">
+                                <button type="button" onClick={() => handleDelete(bug)} title="Delete" aria-label="Delete bug" className="text-gray-500 hover:text-red-500">
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                             </li>

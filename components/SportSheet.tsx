@@ -105,7 +105,7 @@ export const SportSheet: React.FC<SportSheetProps> = ({
           {reportMode && (
             <div className="flex items-center gap-2 text-sm">
               <span className="font-bold text-gray-600">Threshold:</span>
-              <input
+              <input aria-label="Attendance threshold"
                 type="number"
                 value={tempThreshold}
                 onChange={(e) => {
@@ -120,7 +120,7 @@ export const SportSheet: React.FC<SportSheetProps> = ({
           )}
         </div>
         <div className="flex gap-2">
-          <select
+          <select aria-label="Member group"
             className="px-3 py-1 border rounded text-sm bg-white focus:ring-2 focus:ring-[#FFB81C]"
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value as any)}
@@ -129,7 +129,7 @@ export const SportSheet: React.FC<SportSheetProps> = ({
             <option value={Role.OFFICER}>Officers</option>
             <option value={Role.MEMBER}>Members</option>
           </select>
-          <input
+          <input aria-label="Filter by name"
             type="text"
             placeholder="Filter by name..."
             value={filter}
