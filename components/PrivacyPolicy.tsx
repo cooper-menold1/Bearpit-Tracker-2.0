@@ -7,7 +7,10 @@ const CONTACT_EMAIL = 'cooper_menold1@baylor.edu';
 export const PrivacyPolicyModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
         <div
-            className="bg-white rounded-2xl shadow-2xl border-2 border-[#FFB81C] max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Privacy Policy"
+            className="bg-white rounded-2xl shadow-2xl border-2 border-[#FFB81C] max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden text-left"
             onClick={e => e.stopPropagation()}
         >
             <div className="bg-[#154734] p-4 flex items-center justify-between">
@@ -23,7 +26,7 @@ export const PrivacyPolicyModal: React.FC<{ onClose: () => void }> = ({ onClose 
                     <h3 className="font-bold text-gray-900 mb-1">Who runs this site</h3>
                     <p>
                         This site is run by the BearPit student section leadership team, a student-run organization.
-                        It is not an official Baylor University website. {/* TODO (owner): confirm this wording. */}
+                        It is an independent, student-run website and is not operated by Baylor University.
                     </p>
                 </section>
 
