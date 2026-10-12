@@ -170,7 +170,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         {/* Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="text-lg font-bold text-[#154734] mb-4">Avg. Attendance (Home Games)</h3>
-            <div className="h-[300px]">
+            <div className="h-[300px]" role="img" aria-label="Bar chart of average home-game attendance per sport">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={sportStats}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -199,10 +199,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                 <table className="w-full text-sm text-left text-gray-500">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
-                            <th className="px-4 py-3">Rank</th>
-                            <th className="px-4 py-3">Name</th>
-                            <th className="px-4 py-3 text-center">Games</th>
-                            <th className="px-4 py-3 text-center">Bonus</th>
+                            <th scope="col" className="px-4 py-3">Rank</th>
+                            <th scope="col" className="px-4 py-3">Name</th>
+                            <th scope="col" className="px-4 py-3 text-center">Games</th>
+                            <th scope="col" className="px-4 py-3 text-center">Bonus</th>
                         </tr>
                     </thead>
                     <tbody>

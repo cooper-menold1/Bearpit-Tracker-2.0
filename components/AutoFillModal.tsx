@@ -301,7 +301,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Start Date</label>
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider px-1">Start Date</label>
                                     <input aria-label="Start date" 
                                         type="date" 
                                         value={meetingConfig.startDate}
@@ -310,7 +310,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">End Date</label>
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider px-1">End Date</label>
                                     <input aria-label="End date" 
                                         type="date" 
                                         value={meetingConfig.endDate}
@@ -322,7 +322,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Meeting Time</label>
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider px-1">Meeting Time</label>
                                     <div className="relative">
                                         <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input aria-label="Meeting time" 
@@ -334,7 +334,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">Day of Week</label>
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider px-1">Day of Week</label>
                                     <select aria-label="Day of week" 
                                         value={meetingConfig.dayOfWeek}
                                         onChange={(e) => setMeetingConfig({...meetingConfig, dayOfWeek: Number(e.target.value)})}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 // Contact address for privacy requests (confirmed by Cooper 2026-10-12).
@@ -110,7 +111,7 @@ export const PrivacyLink: React.FC<{ className?: string }> = ({ className = '' }
             <button type="button" onClick={() => setOpen(true)} className={`underline font-semibold hover:text-[#FFB81C] transition-colors ${className}`}>
                 Privacy Policy
             </button>
-            {open && <PrivacyPolicyModal onClose={() => setOpen(false)} />}
+            {open && createPortal(<PrivacyPolicyModal onClose={() => setOpen(false)} />, document.body)}
         </>
     );
 };

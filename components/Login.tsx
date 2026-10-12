@@ -107,12 +107,18 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-[#154734] via-[#154734]/60 to-transparent pointer-events-none" />
                 <div className="relative z-10 px-8 transform hover:scale-105 transition-transform duration-500">
-                    <img
-                        src={LOGO_V2}
-                        alt="The BearPit"
+                    <button
+                        type="button"
+                        aria-label="The BearPit logo"
                         onClick={handleLogoClick}
-                        className="w-full max-w-xl drop-shadow-2xl cursor-pointer"
-                    />
+                        className="block w-full max-w-xl p-0 m-0 bg-transparent border-0 cursor-pointer"
+                    >
+                        <img
+                            src={LOGO_V2}
+                            alt=""
+                            className="w-full drop-shadow-2xl"
+                        />
+                    </button>
                 </div>
                 <button
                     onClick={() => setShowPortal(true)}
@@ -237,7 +243,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                 type="text"
                                 aria-label="Email or full name"
                                 placeholder="Email or Full Name"
-                                className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                className="w-full p-4 bg-black/20 text-white placeholder-white/60border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 autoComplete="off"
@@ -247,7 +253,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                 type="password"
                                 aria-label="Password"
                                 placeholder="Password"
-                                className="w-full p-4 bg-black/20 text-white placeholder-white/40 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                className="w-full p-4 bg-black/20 text-white placeholder-white/60border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 autoComplete="new-password"
