@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
-// TODO (owner): replace with the real contact address for privacy requests.
-const CONTACT_EMAIL = '[TODO: BearPit contact email]';
+// Contact address for privacy requests (confirmed by Cooper 2026-10-12).
+const CONTACT_EMAIL = 'cooper_menold1@baylor.edu';
 
 export const PrivacyPolicyModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
@@ -79,8 +79,7 @@ export const PrivacyPolicyModal: React.FC<{ onClose: () => void }> = ({ onClose 
                 <section>
                     <h3 className="font-bold text-gray-900 mb-1">How long we keep it</h3>
                     <p>
-                        We keep your information for the current academic year. Officers delete it on request.
-                        {/* TODO (owner): confirm retention period. */}
+                        We keep your information while you are a BearPit member. Officers delete it on request.
                     </p>
                 </section>
 
