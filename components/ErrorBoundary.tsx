@@ -34,7 +34,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         if (this.state.hasError) {
             return (
                 <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                    <div className="bg-white p-8 rounded-xl shadow-sm text-center max-w-md w-full border-t-4 border-[#154734]">
+                    <div role="alert" className="bg-white p-8 rounded-xl shadow-sm text-center max-w-md w-full border-t-4 border-[#154734]">
                         <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
                         <p className="text-gray-600 mb-6">This page hit an error. Reloading usually fixes it.</p>
                         <button

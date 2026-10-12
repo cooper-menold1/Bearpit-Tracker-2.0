@@ -55,22 +55,22 @@ export const PointsTable: React.FC<PointsTableProps> = ({ data }) => {
         <table className="w-full text-sm text-left">
           <thead className="bg-[#154734] text-white uppercase text-xs">
             <tr>
-              <th className="px-4 py-3 rounded-tl-lg">Rank</th>
-              <th className="px-4 py-3">Member</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3 text-center">Base Pts</th>
-              <th className="px-4 py-3 text-center">Game Pts</th>
-              <th className="px-4 py-3 text-center">Bonus Pts</th>
-              <th className="px-4 py-3 text-right font-bold rounded-tr-lg">Total Score</th>
+              <th scope="col" className="px-4 py-3 rounded-tl-lg">Rank</th>
+              <th scope="col" className="px-4 py-3">Member</th>
+              <th scope="col" className="px-4 py-3">Role</th>
+              <th scope="col" className="px-4 py-3 text-center">Base Pts</th>
+              <th scope="col" className="px-4 py-3 text-center">Game Pts</th>
+              <th scope="col" className="px-4 py-3 text-center">Bonus Pts</th>
+              <th scope="col" className="px-4 py-3 text-right font-bold rounded-tr-lg">Total Score</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 border border-gray-200">
             {pointsData.map((row, idx) => (
                 <tr key={row.id} className={`hover:bg-gray-50 ${idx < 3 ? 'bg-yellow-50/30' : ''}`}>
                     <td className="px-4 py-3 font-bold text-gray-500">
-                        {idx === 0 ? <Medal className="w-5 h-5 text-[#FFB81C]" /> : 
-                         idx === 1 ? <Medal className="w-5 h-5 text-gray-400" /> :
-                         idx === 2 ? <Medal className="w-5 h-5 text-amber-700" /> : 
+                        {idx === 0 ? <Medal role="img" aria-label="1st place" className="w-5 h-5 text-[#FFB81C]" /> :
+                         idx === 1 ? <Medal role="img" aria-label="2nd place" className="w-5 h-5 text-gray-400" /> :
+                         idx === 2 ? <Medal role="img" aria-label="3rd place" className="w-5 h-5 text-amber-700" /> :
                          `#${idx + 1}`}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
