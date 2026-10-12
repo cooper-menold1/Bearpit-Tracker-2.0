@@ -243,7 +243,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                 type="text"
                                 aria-label="Email or full name"
                                 placeholder="Email or Full Name"
-                                className="w-full p-4 bg-black/20 text-white placeholder-white/60border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                className="w-full p-4 bg-black/20 text-white placeholder-white/60 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 autoComplete="off"
@@ -253,7 +253,7 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                                 type="password"
                                 aria-label="Password"
                                 placeholder="Password"
-                                className="w-full p-4 bg-black/20 text-white placeholder-white/60border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
+                                className="w-full p-4 bg-black/20 text-white placeholder-white/60 border border-[#FFB81C]/30 rounded-xl focus:ring-2 focus:ring-[#FFB81C] outline-none transition-all text-lg"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 autoComplete="new-password"

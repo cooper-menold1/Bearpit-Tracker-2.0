@@ -163,7 +163,7 @@ export const matchGamesToExisting = (queries: SlotQuery[], existing: SlotCandida
         });
     };
     run((q, c) => { const t = normTime(q.time); return t ? c.find(e => normTime(e.time) === t) : undefined; });
-    run((q, c) => c.find(e => e.opponent.toLowerCase() === q.opponent.toLowerCase()));
+    run((q, c) => c.find(e => String(e.opponent ?? '').toLowerCase() === String(q.opponent ?? '').toLowerCase()));
     run((q, c) => {
         const n = queries.filter((o, j) => !result[j] && o.sportKey === q.sportKey && o.date === q.date).length;
         return c.length === 1 && n === 1 ? c[0] : undefined;
