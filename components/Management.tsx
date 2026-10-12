@@ -10,6 +10,7 @@ import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
 import { BugLog } from './BugLog';
 import { gamePointValue } from '../utils/fanTier';
+import { parseLocalDate } from '../utils/dateUtils';
 
 // Inline helper to avoid import issues
 const convertInputToCST = (dateStr: string, timeStr: string, sourceTimeZone: string): { date: string, time: string } => {
@@ -479,8 +480,8 @@ export const Management: React.FC<ManagementProps> = ({
                                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
                                     <div className="bg-[#154734] p-4 flex justify-between items-center text-white shrink-0">
                                         <div>
-                                            <h3 className="font-bold text-lg leading-none">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' })}</h3>
-                                            <p className="text-white/80 text-sm">{new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                                            <h3 className="font-bold text-lg leading-none">{parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long' })}</h3>
+                                            <p className="text-white/80 text-sm">{parseLocalDate(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                                         </div>
                                         <button onClick={() => setShowDayDetails(false)} className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
                                     </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Game, Sport } from '../types';
 import { ChevronLeft, ChevronRight, Trophy, List, Calendar } from 'lucide-react';
-import { formatLocalDate, parseLocalDate } from '../utils/dateUtils';
+import { formatLocalDate, parseLocalDate, todayInChicago } from '../utils/dateUtils';
 
 interface GameCalendarProps {
     games: Game[];
@@ -28,7 +28,8 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
         : games;
 
     // Sort games for list view
-    const sortedGames = [...filteredGames].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Dates are YYYY-MM-DD strings; compare as strings (new Date() would parse them as UTC).
+    const sortedGames = [...filteredGames].sort((a, b) => a.date.localeCompare(b.date));
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full">
@@ -66,7 +67,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                         className="bg-white text-[#154734] px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm font-bold text-xs outline-none focus:ring-1 focus:ring-[#154734] hover:bg-gray-50 transition-colors"
                     >
                         <option value="">All Sports</option>
-                        {sports.sort((a, b) => a.name.localeCompare(b.name)).map(sport => (
+                        {[...sports].sort((a, b) => a.name.localeCompare(b.name)).map(sport => (
                             <option key={sport.id} value={sport.id}>{sport.name}</option>
                         ))}
                     </select>
@@ -107,7 +108,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                             const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
                             const dateStr = formatLocalDate(cellDate);
                             const daysGames = filteredGames.filter(g => g.date === dateStr);
-                            const todayStr = formatLocalDate(new Date());
+                            const todayStr = todayInChicago();
                             const isToday = dateStr === todayStr;
 
                             return (

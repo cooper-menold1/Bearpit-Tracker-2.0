@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Search, Check, AlertCircle, Loader2, Calendar as CalendarIcon, Info, Trophy, ChevronRight, Plus, MapPin, Clock } from 'lucide-react';
 import { Game, Sport, Role } from '../types';
 import { fetchSchedule, ScrapedGame, resolveSportMappings } from '../utils/scraper';
-import { parseLocalDate, formatLocalDate } from '../utils/dateUtils';
+import { parseLocalDate, formatLocalDate, todayInChicago, addDaysToDateStr } from '../utils/dateUtils';
 
 interface AutoFillModalProps {
     isOpen: boolean;
@@ -29,8 +29,8 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
     const [activeTab, setActiveTab] = useState<'new' | 'updates'>('new');
     const [autoFillMode, setAutoFillMode] = useState<'scrape' | 'meetings'>('scrape');
     const [meetingConfig, setMeetingConfig] = useState({
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        startDate: todayInChicago(),
+        endDate: addDaysToDateStr(todayInChicago(), 90),
         time: '17:30',
         dayOfWeek: 4 // Thursday
     });
@@ -264,7 +264,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                     onChange={(e) => setYear(Number(e.target.value))}
                                     className="w-32 border-2 border-gray-200 rounded-xl p-3 font-bold focus:border-[#154734] outline-none transition-colors"
                                 >
-                                    {[2024, 2025, 2026].map(y => (
+                                    {[2024, 2025, 2026, 2027].map(y => (
                                         <option key={y} value={y}>{y}</option>
                                     ))}
                                 </select>
@@ -538,7 +538,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                                                 {s.status === 'update' && <span className="bg-blue-100 text-blue-600 text-[8px] px-1 rounded font-black uppercase">New Info</span>}
                                                             </div>
                                                             <div className="text-xs text-gray-500">
-                                                                {game.sportName} • {new Date(game.date).toLocaleDateString()} at {game.time}
+                                                                {game.sportName} • {parseLocalDate(game.date).toLocaleDateString()} at {game.time}
                                                             </div>
                                                             {s.status === 'update' && existing && (
                                                                 <div className="mt-2 text-[10px] bg-blue-50/50 p-2 rounded border border-blue-100/50">

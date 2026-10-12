@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Member, Game, Sport } from '../types';
 import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { VENUES } from '../constants';
+import { todayInChicago } from '../utils/dateUtils';
 import { getDistance, getCurrentPosition } from '../utils/location';
 
 export interface AttendanceLocation {
@@ -41,7 +42,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
     const [location, setLocation] = useState<AttendanceLocation | null>(null);
 
     // Date filtering: Only show games for TODAY
-    const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const todayStr = todayInChicago(); // YYYY-MM-DD, Central time
     const todaysGames = games
         .filter(g => g.date === todayStr)
         .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));

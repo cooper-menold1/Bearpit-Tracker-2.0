@@ -24,7 +24,7 @@ export const SportSheet: React.FC<SportSheetProps> = ({
   const [tempThreshold, setTempThreshold] = useState(attendanceThreshold * 100);
 
   const sortedGames = useMemo(() => {
-    return [...games].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return [...games].sort((a, b) => a.date.localeCompare(b.date));
   }, [games]);
 
   // Filter members who have selected this sport

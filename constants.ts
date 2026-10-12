@@ -42,8 +42,9 @@ export const FAN_TIERS = [
   { name: 'BPLT All-Star', minPoints: 60, minCategories: 4 },
 ];
 
-// Shown on the landing page's "Interested in Joining?" card. Set to '' to hide.
-export const NEXT_INTEREST_MEETING = 'Monday, Oct. 5';
+// Shown on the landing page's "Interested in Joining?" card. '' hides the badge.
+// To re-enable, set it to the next meeting, e.g. 'Monday, Nov. 2'.
+export const NEXT_INTEREST_MEETING = '';
 
 export const AUTHORIZED_USERS = [
   "Ben Jacob",

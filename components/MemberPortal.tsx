@@ -7,7 +7,7 @@ import { SettingsModal } from './SettingsModal';
 import { Management } from './Management';
 import { Leaderboard } from './Leaderboard';
 import { FAN_TIERS } from '../constants';
-import { formatLocalDate, parseLocalDate } from '../utils/dateUtils';
+import { todayInChicago, parseLocalDate } from '../utils/dateUtils';
 import { computeLifetimeStats, gamePointValue } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
 
@@ -15,9 +15,10 @@ const formatUpcomingDate = (dateStr: string) =>
     parseLocalDate(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 // "19:00" -> "7:00 PM"
+// Anything that isn't strict 24h HH:MM (e.g. "7 p.m.", "TBA") is shown as-is.
 const formatTime = (time: string) => {
-    const [h, m] = time.split(':').map(Number);
-    if (Number.isNaN(h)) return time;
+    if (!/^\d{1,2}:\d{2}$/.test(time.trim())) return time;
+    const [h, m] = time.trim().split(':').map(Number);
     return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 };
 
@@ -86,7 +87,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
 
     // Next few games + club events, shown above the leaderboard.
     const upcoming = useMemo(() => {
-        const today = formatLocalDate(new Date());
+        const today = todayInChicago();
         const games = data.games
             .filter(g => g.date.slice(0, 10) >= today)
             .map(g => ({
@@ -379,23 +380,34 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                 <p className="text-xs text-gray-500 mt-1">Tabling shifts and other club events. Signing up claims a slot and awards the points automatically.</p>
                             </div>
                             <div className="divide-y divide-gray-100">
-                                {[...data.clubEvents].sort((a, b) => a.date.localeCompare(b.date)).map(ev => {
+                                {[...data.clubEvents].sort((a, b) => {
+                                    // Upcoming first (soonest to latest), then past events (most recent first).
+                                    const today = todayInChicago();
+                                    const aPast = a.date < today, bPast = b.date < today;
+                                    if (aPast !== bPast) return aPast ? 1 : -1;
+                                    return aPast ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
+                                }).map(ev => {
                                     const taken = data.eventSignups.filter(s => s.eventId === ev.id).length;
                                     const mySignup = data.eventSignups.find(s => s.eventId === ev.id && s.memberId === member.id);
                                     const isFull = taken >= ev.maxSignups;
+                                    const isPast = ev.date < todayInChicago();
                                     return (
                                         <div key={ev.id} className="p-4 flex items-center justify-between gap-4 hover:bg-gray-50">
                                             <div>
                                                 <p className="font-bold text-gray-900">{ev.title}</p>
                                                 <div className="flex items-center gap-3 text-xs text-gray-500 mt-1 flex-wrap">
-                                                    <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {ev.date}{ev.time ? ` · ${ev.time}` : ''}</span>
+                                                    <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {formatUpcomingDate(ev.date)}{ev.time ? ` · ${formatTime(ev.time)}` : ''}</span>
                                                     {ev.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {ev.location}</span>}
                                                     <span className="bg-[#154734]/10 text-[#154734] font-bold px-2 py-0.5 rounded-full">{ev.category} · +{ev.pointsValue} pts</span>
                                                     <span className={`font-bold ${isFull ? 'text-red-500' : 'text-gray-500'}`}>{taken}/{ev.maxSignups} slots filled</span>
                                                 </div>
                                                 {ev.description && <p className="text-xs text-gray-400 mt-1">{ev.description}</p>}
                                             </div>
-                                            {mySignup ? (
+                                            {mySignup && isPast ? (
+                                                <span className="flex items-center gap-1 text-sm font-bold text-green-700 px-3 py-1.5 shrink-0"><CheckCircle2 className="w-4 h-4" /> Attended</span>
+                                            ) : isPast ? (
+                                                <span className="text-sm font-bold text-gray-400 px-3 py-1.5 shrink-0">Ended</span>
+                                            ) : mySignup ? (
                                                 <button
                                                     onClick={() => onCancelSignup?.(mySignup.id)}
                                                     className="flex items-center gap-1 text-sm font-bold text-white bg-green-600 hover:bg-red-500 px-3 py-1.5 rounded-lg transition-colors shrink-0"

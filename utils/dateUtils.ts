@@ -118,3 +118,19 @@ export const convertInputToCST = (dateStr: string, timeStr: string, sourceTimeZo
 
   return { date: finalDate, time: finalTime };
 };
+
+/**
+ * Today's date (YYYY-MM-DD) in America/Chicago, regardless of the browser's
+ * own time zone. Game dates are stored as Central-time calendar dates.
+ */
+export const todayInChicago = (): string =>
+  new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+
+/**
+ * Adds days to a YYYY-MM-DD string and returns YYYY-MM-DD (no time zone math).
+ */
+export const addDaysToDateStr = (dateStr: string, days: number): string => {
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return formatLocalDate(d);
+};
