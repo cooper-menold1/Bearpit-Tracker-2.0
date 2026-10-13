@@ -1,26 +1,19 @@
 
 import React, { useMemo, useState } from 'react';
 import { Member, AppState, Game, Role, ClubEvent } from '../types';
-import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus } from 'lucide-react';
+import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus, Heart } from 'lucide-react';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { Management } from './Management';
 import { Leaderboard } from './Leaderboard';
+import { SelfieContest } from './SelfieContest';
 import { FAN_TIERS } from '../constants';
-import { todayInChicago, parseLocalDate } from '../utils/dateUtils';
+import { todayInChicago, parseLocalDate, formatGameTime, timeSortKey } from '../utils/dateUtils';
 import { computeLifetimeStats, gamePointValue } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
 
 const formatUpcomingDate = (dateStr: string) =>
     parseLocalDate(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-
-// "19:00" -> "7:00 PM"
-// Anything that isn't strict 24h HH:MM (e.g. "7 p.m.", "TBA") is shown as-is.
-const formatTime = (time: string) => {
-    if (!/^\d{1,2}:\d{2}$/.test(time.trim())) return time;
-    const [h, m] = time.trim().split(':').map(Number);
-    return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-};
 
 interface MemberPortalProps {
     member: Member;
@@ -39,8 +32,7 @@ interface MemberPortalProps {
 }
 
 export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports, onAddClubEvent, onDeleteClubEvent, onSignUpForEvent, onCancelSignup }) => {
-    // 'vote' (selfie contest) tab removed 2026-10-02 while the selfie gallery is broken.
-    const [view, setView] = useState<'leaderboard' | 'stats' | 'calendar' | 'events' | 'edit_calendar'>('leaderboard');
+    const [view, setView] = useState<'leaderboard' | 'vote' | 'stats' | 'calendar' | 'events' | 'edit_calendar'>('leaderboard');
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
     const [showDayModal, setShowDayModal] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -113,7 +105,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 isBonus: false,
             }));
         return [...games, ...events]
-            .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
+            .sort((a, b) => a.date.localeCompare(b.date) || timeSortKey(a.time).localeCompare(timeSortKey(b.time)))
             .slice(0, 6);
     }, [data.games, data.clubEvents, data.sports]);
 
@@ -161,6 +153,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                             <Trophy className="w-4 h-4" /> Leaderboard
                         </button>
                         <button
+                            onClick={() => setView('vote')}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-bold transition-all ${view === 'vote' ? 'bg-white text-[#154734] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <Heart className="w-4 h-4" /> Vote
+                        </button>
+                        <button
                             onClick={() => setView('stats')}
                             className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-bold transition-all ${view === 'stats' ? 'bg-white text-[#154734] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
@@ -205,7 +203,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                         <div className="min-w-0">
                                             <p className="font-bold text-gray-900 truncate">{u.title}</p>
                                             <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-                                                <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {formatUpcomingDate(u.date)}{u.time ? ` · ${formatTime(u.time)}` : ''}</span>
+                                                <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {formatUpcomingDate(u.date)}{u.time ? ` · ${formatGameTime(u.time)}` : ''}</span>
                                                 {u.sub && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {u.sub}</span>}
                                             </div>
                                         </div>
@@ -225,6 +223,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                             </div>
                         </div>
                         <Leaderboard data={data} />
+                    </div>
+                ) : view === 'vote' ? (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <SelfieContest data={data} currentMember={member} onVote={onVote} />
                     </div>
                 ) : view === 'edit_calendar' && canEdit && sports && onAddGame && onDeleteGame ? (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -396,7 +398,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                             <div>
                                                 <p className="font-bold text-gray-900">{ev.title}</p>
                                                 <div className="flex items-center gap-3 text-xs text-gray-500 mt-1 flex-wrap">
-                                                    <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {formatUpcomingDate(ev.date)}{ev.time ? ` · ${formatTime(ev.time)}` : ''}</span>
+                                                    <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {formatUpcomingDate(ev.date)}{ev.time ? ` · ${formatGameTime(ev.time)}` : ''}</span>
                                                     {ev.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {ev.location}</span>}
                                                     <span className="bg-[#154734]/10 text-[#154734] font-bold px-2 py-0.5 rounded-full">{ev.category} · +{ev.pointsValue} pts</span>
                                                     <span className={`font-bold ${isFull ? 'text-red-500' : 'text-gray-500'}`}>{taken}/{ev.maxSignups} slots filled</span>
@@ -483,7 +485,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                                     </div>
                                                     <div className="text-xs text-gray-500 flex items-center gap-3 mt-1">
                                                         <span className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                            <Clock className="w-3 h-3" /> {game.time || 'TBA'}
+                                                            <Clock className="w-3 h-3" /> {formatGameTime(game.time)}
                                                         </span>
                                                         <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${game.location === 'Home' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                                             }`}>

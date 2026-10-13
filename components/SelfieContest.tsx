@@ -18,7 +18,7 @@ export const SelfieContest: React.FC<SelfieContestProps> = ({ data, currentMembe
         const gameIdsWithSelfies = new Set(data.selfies.map(s => s.gameId));
         return data.games
             .filter(g => gameIdsWithSelfies.has(g.id))
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            .sort((a, b) => b.date.localeCompare(a.date));
     }, [data.games, data.selfies]);
 
     // 1. Selection State

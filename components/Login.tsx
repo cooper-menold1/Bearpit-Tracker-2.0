@@ -88,9 +88,9 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
         onLogin(member, password);
     };
 
-    const recentSelfies = selfies
+    const recentSelfies = [...selfies]
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 30);
+        .slice(0, 18);
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -98,10 +98,10 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
                 <div className="absolute inset-0 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-0 opacity-40">
                     {recentSelfies.map(selfie => (
                         <div key={selfie.id} className="relative aspect-square overflow-hidden">
-                            <img src={selfie.imageData} alt="" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
+                            <img src={selfie.imageData} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
                         </div>
                     ))}
-                    {Array.from({ length: Math.max(0, 30 - recentSelfies.length) }).map((_, i) => (
+                    {Array.from({ length: Math.max(0, 18 - recentSelfies.length) }).map((_, i) => (
                         <div key={`filler-${i}`} className="bg-green-900/20 w-full h-full animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
                     ))}
                 </div>

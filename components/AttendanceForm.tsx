@@ -4,7 +4,8 @@ import { Member, Game, Sport } from '../types';
 import { PrivacyLink } from './PrivacyPolicy';
 import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { VENUES } from '../constants';
-import { todayInChicago } from '../utils/dateUtils';
+import { todayInChicago, formatGameTime } from '../utils/dateUtils';
+import { SelfieUpload } from './SelfieUpload';
 import { getDistance, getCurrentPosition, geofenceStatus, isInAppBrowser, APPROX_ACCURACY_METERS } from '../utils/location';
 
 export interface AttendanceLocation {
@@ -174,7 +175,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Sic 'Em!</h2>
                     <p className="text-gray-600 mb-6">Your attendance has been recorded.</p>
-                    {/* SELFIE_UPLOAD_SLOT: render the selfie upload card here using checkedInMemberId, checkedInGameId, checkedInSportId */}
+                    {checkedInMemberId && checkedInGameId && checkedInSportId && (<SelfieUpload memberId={checkedInMemberId} gameId={checkedInGameId} sportId={checkedInSportId} />)}
                     <button
                         onClick={() => window.location.reload()}
                         className="text-[#154734] hover:text-[#FFB81C] font-bold transition-colors"
@@ -277,7 +278,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                             <option value="">-- Select an Event --</option>
                                             {todaysGames.map(g => (
                                                 <option key={g.id} value={g.id}>
-                                                    {g.opponent} ({g.location}) - {g.time || 'TBA'}
+                                                    {g.opponent} ({g.location}) - {formatGameTime(g.time)}
                                                 </option>
                                             ))}
                                         </select>
