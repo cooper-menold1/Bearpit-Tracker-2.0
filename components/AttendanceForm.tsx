@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Member, Game, Sport } from '../types';
 import { PrivacyLink } from './PrivacyPolicy';
 import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { VENUES } from '../constants';
 import { todayInChicago } from '../utils/dateUtils';
-import { getDistance, getCurrentPosition } from '../utils/location';
+import { getDistance, getCurrentPosition, geofenceStatus, isInAppBrowser, APPROX_ACCURACY_METERS } from '../utils/location';
 
 export interface AttendanceLocation {
     latitude: number;
@@ -19,7 +19,7 @@ interface AttendanceFormProps {
     members: Member[];
     games: Game[];
     sports: Sport[];
-    onSubmit: (gameId: string, memberId: string, location: AttendanceLocation | null, newMemberDetails?: Member) => void;
+    onSubmit: (gameId: string, memberId: string, location: AttendanceLocation | null, newMemberDetails?: Member) => Promise<string | null>;
     onBack: () => void;
 }
 
@@ -36,6 +36,14 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
     const hasVenues = (selectedSport?.venueIds?.length || 0) > 0 && !isAwayGame;
 
     const [submitted, setSubmitted] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    // Kept for the success screen (selfie upload card)
+    const [checkedInMemberId, setCheckedInMemberId] = useState<string | null>(null);
+    const [checkedInGameId, setCheckedInGameId] = useState<string | null>(null);
+    const [checkedInSportId, setCheckedInSportId] = useState<string | null>(null);
+    const requestIdRef = useRef(0);
+    const inApp = isInAppBrowser();
 
     // Location Sharing States
     const [isVerifyingLocation, setIsVerifyingLocation] = useState(false);
@@ -49,6 +57,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
         .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
 
     const shareLocation = async (gameId: string) => {
+        const myId = ++requestIdRef.current;
         if (!gameId) {
             setLocation(null);
             return;
@@ -68,6 +77,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                 : [];
 
             const position = await getCurrentPosition();
+            if (myId !== requestIdRef.current) return;
             const { latitude, longitude, accuracy } = position.coords;
 
             let distanceMeters: number | null = null;
@@ -75,21 +85,29 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
             if (validVenues.length > 0) {
                 distanceMeters = Math.min(...validVenues.map(v => getDistance(latitude, longitude, v.latitude, v.longitude)));
-                withinGeofence = validVenues.some(v => getDistance(latitude, longitude, v.latitude, v.longitude) <= v.radiusMeters);
+                const statuses = validVenues.map(v =>
+                    geofenceStatus(getDistance(latitude, longitude, v.latitude, v.longitude), accuracy, v.radiusMeters));
+                withinGeofence = statuses.some(x => x === true) ? true : statuses.every(x => x === null) ? null : false;
             }
 
             setLocation({ latitude, longitude, accuracyMeters: accuracy, distanceMeters, withinGeofence });
         } catch (err: any) {
+            if (myId !== requestIdRef.current) return;
             console.error("Location sharing failed", err);
-            if (err.code === 1) {
-                setLocationError("Location access is required to log attendance. Please allow location sharing and try again.");
-            } else if (err.code === 3) {
-                setLocationError("Location request timed out. Please try again.");
+            let msg: string;
+            if (err?.code === 1) {
+                msg = "Location is blocked for this site. iPhone: Settings > Privacy & Security > Location Services > Safari Websites > While Using (and turn on Precise Location), then tap Retry. Android: tap the lock icon in the address bar > Permissions > Location.";
+            } else if (err?.code === 2) {
+                msg = "Your phone couldn't find your location. Make sure Location Services is on, then Retry.";
+            } else if (err?.code === 3) {
+                msg = "Getting your location took too long. Step outside or near a window and tap Retry.";
             } else {
-                setLocationError(err.message || "Could not get your location.");
+                msg = "Could not get your location. Please tap Retry.";
             }
+            if (inApp) msg = "You're in an in-app browser. Open this page in Safari/Chrome for location to work (tap ••• > Open in browser). " + msg;
+            setLocationError(msg);
         } finally {
-            setIsVerifyingLocation(false);
+            if (myId === requestIdRef.current) setIsVerifyingLocation(false);
         }
     };
 
@@ -123,12 +141,28 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedGameId || !matchedMember) return;
+        if (!selectedGameId || !matchedMember || isSubmitting) return;
 
-        onSubmit(selectedGameId, matchedMember.id, location);
-        setSubmitted(true);
+        setIsSubmitting(true);
+        setSubmitError(null);
+        try {
+            const err = await onSubmit(selectedGameId, matchedMember.id, location);
+            if (err) {
+                setSubmitError(err);
+            } else {
+                setCheckedInMemberId(matchedMember.id);
+                setCheckedInGameId(selectedGameId);
+                setCheckedInSportId(selectedGame?.sportId ?? null);
+                setSubmitted(true);
+            }
+        } catch (ex: any) {
+            console.error('Check-in failed', ex);
+            setSubmitError("Check-in didn't save: " + (ex?.message || 'unknown error') + ". Please try again or tell an officer.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (submitted) {
@@ -140,6 +174,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Sic 'Em!</h2>
                     <p className="text-gray-600 mb-6">Your attendance has been recorded.</p>
+                    {/* SELFIE_UPLOAD_SLOT: render the selfie upload card here using checkedInMemberId, checkedInGameId, checkedInSportId */}
                     <button
                         onClick={() => window.location.reload()}
                         className="text-[#154734] hover:text-[#FFB81C] font-bold transition-colors"
@@ -210,6 +245,12 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
                     {step === 2 && (
                         <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+                            {inApp && (
+                                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <span>You're in an in-app browser. Open this page in Safari/Chrome for location to work (tap ••• &gt; Open in browser).</span>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Current Date</label>
                                 <div className="relative">
@@ -294,6 +335,11 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                                 <MapPin className="w-4 h-4 shrink-0" />
                                                 <span>Location shared, but you look ~{Math.round(location.distanceMeters!)}m from the venue. This will be flagged for an officer to double-check.</span>
                                             </div>
+                                        ) : hasVenues && location.accuracyMeters > APPROX_ACCURACY_METERS ? (
+                                            <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                                                <MapPin className="w-4 h-4 shrink-0" />
+                                                <span>Your phone only shared an approximate location (turn on Precise Location). An officer will double-check.</span>
+                                            </div>
                                         ) : (
                                             <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-100">
                                                 <CheckCircle2 className="w-4 h-4" />
@@ -304,13 +350,20 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                 </div>
                             )}
 
+                            {submitError && (
+                                <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 p-3 rounded-lg border border-red-200">
+                                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <span>{submitError}</span>
+                                </div>
+                            )}
+
                             <button
                                 onClick={handleSubmit}
-                                disabled={!selectedGameId || isVerifyingLocation}
+                                disabled={!selectedGameId || isVerifyingLocation || isSubmitting}
                                 className="w-full bg-[#154734] text-white py-3 rounded-lg font-bold hover:bg-[#0f3325] disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-colors mt-4 flex items-center justify-center gap-2"
                             >
-                                <CheckCircle2 className="w-5 h-5" />
-                                Submit Attendance
+                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
                             </button>
                         </div>
                     )}
