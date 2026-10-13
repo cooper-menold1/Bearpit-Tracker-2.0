@@ -9,9 +9,9 @@ export const VENUES: Venue[] = [
   { id: 'ballpark', name: 'Baylor Ballpark', latitude: 31.551278, longitude: -97.107779, radiusMeters: 200 },
   { id: 'getterman', name: 'Getterman Stadium', latitude: 31.54987, longitude: -97.10824, radiusMeters: 150 },
   { id: 'bettylou', name: 'Betty Lou Mays Field', latitude: 31.55177, longitude: -97.10909, radiusMeters: 200 },
-  { id: 'hurd', name: 'Hurd Tennis Center', latitude: 31.55177, longitude: -97.10909, radiusMeters: 200 }, // Shares space with soccer
+  { id: 'hurd', name: 'Hurd Tennis Center', latitude: 31.5502238, longitude: -97.1094079, radiusMeters: 200 },
   { id: 'ferrell_vb', name: 'Ferrell Center (Volleyball)', latitude: 31.547903, longitude: -97.105969, radiusMeters: 200 },
-  { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.546944, longitude: -97.116667, radiusMeters: 1000 } // widened to ~1 km so meeting check-ins work from anywhere around Foster
+  { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.5451683, longitude: -97.1154583, radiusMeters: 1000 } // coords corrected 2026-10-13 against OSM (old value was ~230 m off); radius kept at 1 km by owner so meetings work anywhere around Foster
 ];
 
 // Officer-assigned point categories, from the points menu presented at the

@@ -107,8 +107,8 @@ function App() {
         setShowChantManager(false);
     }, [currentMember, mode]);
 
-    // Split from selfies on purpose: selfies.image_data holds full base64 photo
-    // blobs, so re-running that query on every unrelated realtime event (e.g. one
+    // Split from selfies on purpose: selfies.image_data holds public Storage URLs
+    // (photos bucket) for full-size images, so re-running that query on every unrelated realtime event (e.g. one
     // attendance toggle) would re-download every photo for every connected
     // client. fetchCoreData() covers everything else and is cheap to re-run.
     const fetchCoreData = async () => {
@@ -440,10 +440,10 @@ function App() {
         if (window.confirm("Delete sport?")) await supabase.from('sports').delete().eq('id', id);
     };
 
-    const handleFormSubmit = async (gameId: string, memberId: string, location: AttendanceLocation | null, newMember?: Member) => {
+    const handleFormSubmit = async (gameId: string, memberId: string, location: AttendanceLocation | null, newMember?: Member): Promise<string | null> => {
         if (newMember) await handleAddMember(newMember);
-        if (newMember?.role === Role.PROSPECTIVE) return;
-        await supabase.from('attendance').insert({
+        if (newMember?.role === Role.PROSPECTIVE) return null;
+        const { error } = await supabase.from('attendance').insert({
             game_id: gameId,
             member_id: memberId,
             latitude: location?.latitude ?? null,
@@ -452,7 +452,13 @@ function App() {
             distance_meters: location?.distanceMeters ?? null,
             within_geofence: location?.withinGeofence ?? null,
         });
+        if (error) {
+            if (error.code === '23505') return "You're already checked in for this event.";
+            console.error('Attendance insert failed', error);
+            return "Check-in didn't save: " + error.message + ". Please try again or tell an officer.";
+        }
         await fetchCoreData();
+        return null;
     };
 
     const handleToggleSelfieVote = async (selfieId: string, memberId: string) => {
