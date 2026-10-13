@@ -17,6 +17,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const PRUNE_STALE = Deno.env.get("AUTOFILL_PRUNE_STALE") !== "false";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ScrapedGame {
@@ -63,7 +64,7 @@ function parseCalendarPayload(contents: any): ScrapedGame[] {
 
       games.push({
         date: dateStr,
-        time: event.time || "TBA",
+        time: event.time?.trim() || "TBA",
         opponent,
         location,
         sportName,
@@ -80,7 +81,8 @@ const normTime = (t?: string | null): string => {
 };
 
 // Match scraped games to existing by sport + date + start time (keeps doubleheaders separate).
-// Passes (each existing game claimed once): same time; same opponent; lone leftover on that sport/day.
+// Passes (each existing game claimed once): same time; same opponent; lone leftover on that sport/day;
+// pass 4 = "moved": same sport + opponent within +-21 days, where that (sport, opponent, date) is no longer scraped.
 // Keep in sync with matchGamesToExisting in utils/scraper.ts.
 function matchGames(queries: { sportKey?: string; date: string; time?: string; opponent: string }[], existing: any[]): (string | null)[] {
   const result: (string | null)[] = queries.map(() => null);
@@ -98,6 +100,22 @@ function matchGames(queries: { sportKey?: string; date: string; time?: string; o
   run((q, c) => {
     const n = queries.filter((o, j) => !result[j] && o.sportKey === q.sportKey && o.date === q.date).length;
     return c.length === 1 && n === 1 ? c[0] : undefined;
+  });
+  // Pass 4: moved games (date changed on the site).
+  const dayNum = (d: string) => Date.parse(d + "T00:00:00Z") / 86400000;
+  const oppKey = (o: any) => String(o ?? "").trim().toLowerCase();
+  const scrapedKeys = new Set(queries.map((q) => `${q.sportKey}|${oppKey(q.opponent)}|${q.date}`));
+  queries.forEach((q, i) => {
+    if (result[i] || !q.sportKey) return;
+    let best: any = null;
+    let bestDiff = Infinity;
+    for (const e of existing) {
+      if (claimed.has(e.id) || e.sport_id !== q.sportKey || oppKey(e.opponent) !== oppKey(q.opponent)) continue;
+      const diff = Math.abs(dayNum(e.date) - dayNum(q.date));
+      if (!(diff <= 21) || scrapedKeys.has(`${e.sport_id}|${oppKey(e.opponent)}|${e.date}`)) continue;
+      if (diff < bestDiff) { best = e; bestDiff = diff; }
+    }
+    if (best) { result[i] = best.id; claimed.add(best.id); }
   });
   return result;
 }
@@ -178,6 +196,7 @@ Deno.serve(async () => {
     const sportFor = (g: ScrapedGame) =>
       sports.find((s: any) => s.name.toLowerCase() === g.sportName.toLowerCase())
         ?? sports.find((s: any) => g.sportName.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(g.sportName.toLowerCase()));
+    const snapshot = [...(existingGames ?? [])];
     const matchedIds = matchGames(
       scraped.map((g) => ({ sportKey: sportFor(g)?.id, date: g.date, time: g.time, opponent: g.opponent })),
       existingGames ?? [],
@@ -195,19 +214,21 @@ Deno.serve(async () => {
 
       if (existing) {
         const same = existing.opponent.toLowerCase() === g.opponent.toLowerCase()
-          && (existing.time === g.time || (!existing.time && !g.time))
+          && existing.date === g.date
+          && ((existing.time || "").trim() === g.time.trim() || (!existing.time && !g.time))
           && existing.location === g.location;
         if (same) continue;
 
         const { error: updErr } = await supabase.from("games").update({
           opponent: g.opponent,
-          time: g.time,
+          date: g.date,
+          time: g.time.trim(),
           location: g.location,
           description: g.description,
         }).eq("id", existing.id);
         if (updErr) { log.push(`Failed to update game ${g.sportName} ${g.date}: ${updErr.message}`); continue; }
         updated++;
-        log.push(`Updated ${g.sportName} ${g.date}: was "${existing.opponent}"/${existing.time}/${existing.location} -> "${g.opponent}"/${g.time}/${g.location}`);
+        log.push(`Updated ${g.sportName} ${g.date}: was ${existing.date} "${existing.opponent}"/${existing.time}/${existing.location} -> "${g.opponent}"/${g.time}/${g.location}`);
         continue;
       }
 
@@ -232,10 +253,45 @@ Deno.serve(async () => {
       existingGames!.push({ id, sport_id: sport.id, date: g.date, opponent: g.opponent, time: g.time, location: g.location });
     }
 
-    const summary = `Autofill run ${new Date().toISOString()}: +${added} new games, ${updated} games updated, ${skippedUnknownSport} events skipped (no matching known sport).`;
+    // Stale rows: auto-imported, future, inside the fetched window, in a covered sport, and no longer listed.
+    let pruned = 0;
+    let staleKept = 0;
+    const matchedSet = new Set(matchedIds.filter(Boolean));
+    const coveredSports = new Set(scraped.map((g) => sportFor(g)?.id).filter(Boolean));
+    const todayChicago = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date());
+    const winEndD = new Date(now.getFullYear(), now.getMonth() + 3, 0);
+    const winEnd = `${winEndD.getFullYear()}-${String(winEndD.getMonth() + 1).padStart(2, "0")}-${String(winEndD.getDate()).padStart(2, "0")}`;
+    const stale = snapshot.filter((e: any) =>
+      (String(e.id).startsWith("scraped_") || String(e.id).startsWith("autofill_"))
+      && e.date >= todayChicago && e.date <= winEnd
+      && coveredSports.has(e.sport_id)
+      && !matchedSet.has(e.id));
+    if (stale.length > 0) {
+      const withAttendance = new Set<string>();
+      let attendanceOk = true;
+      for (let i = 0; i < stale.length; i += 100) {
+        const { data: att, error: attErr } = await supabase.from("attendance").select("game_id").in("game_id", stale.slice(i, i + 100).map((e: any) => e.id));
+        if (attErr) { attendanceOk = false; log.push(`Attendance check failed, not pruning: ${attErr.message}`); break; }
+        (att ?? []).forEach((a: any) => withAttendance.add(a.game_id));
+      }
+      for (const e of stale as any[]) {
+        const label = `${e.sport_id} ${e.date} ${e.opponent} (${e.id})`;
+        if (!attendanceOk || withAttendance.has(e.id) || !PRUNE_STALE) {
+          staleKept++;
+          log.push(`Stale (kept${withAttendance.has(e.id) ? ", has attendance" : ""}): ${label}`);
+          continue;
+        }
+        const { error: delErr } = await supabase.from("games").delete().eq("id", e.id);
+        if (delErr) { staleKept++; log.push(`Failed to prune ${label}: ${delErr.message}`); continue; }
+        pruned++;
+        log.push(`Pruned stale game: ${label}`);
+      }
+    }
+
+    const summary = `Autofill run ${new Date().toISOString()}: +${added} new games, ${updated} games updated, ${pruned} stale pruned (${staleKept} stale kept), ${skippedUnknownSport} events skipped (no matching known sport).`;
     console.log(summary, log.join(" | "));
 
-    return new Response(JSON.stringify({ ok: true, added, updated, skippedUnknownSport, log }), {
+    return new Response(JSON.stringify({ ok: true, added, updated, pruned, staleKept, skippedUnknownSport, log }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
