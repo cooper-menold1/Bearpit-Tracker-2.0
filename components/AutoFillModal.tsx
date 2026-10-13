@@ -31,7 +31,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
 
     const [scrapedGames, setScrapedGames] = useState<ScrapedGame[]>([]);
     const [sportMappings, setSportMappings] = useState<Record<string, { sportId?: string, status: 'mapped' | 'new' | 'ignore' }>>({});
-    const [gameStatuses, setGameStatuses] = useState<Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string }>>({});
+    const [gameStatuses, setGameStatuses] = useState<Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string, moved?: boolean }>>({});
     const [selectedGames, setSelectedGames] = useState<Set<number>>(new Set());
     const [activeTab, setActiveTab] = useState<'new' | 'updates'>('new');
     const [autoFillMode, setAutoFillMode] = useState<'scrape' | 'meetings'>('scrape');
@@ -74,7 +74,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                 setStep('review-games');
                 // Auto-select games for mapped sports, BUT skip duplicates
                 const toSelect = new Set<number>();
-                const statuses: Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string }> = {};
+                const statuses: Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string, moved?: boolean }> = {};
 
                 const matchedIds = matchScraped(games, initialMappings, existingGames);
                 games.forEach((g, idx) => {
@@ -88,13 +88,14 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                     } else {
                         const isSame =
                             existing.opponent.toLowerCase() === g.opponent.toLowerCase() &&
-                            (existing.time === g.time || (!existing.time && !g.time)) &&
+                            existing.date === g.date &&
+                            ((existing.time || '').trim() === g.time.trim() || (!existing.time && !g.time)) &&
                             existing.location === g.location;
 
                         if (isSame) {
                             statuses[idx] = { status: 'same', existingGameId: existing.id };
                         } else {
-                            statuses[idx] = { status: 'update', existingGameId: existing.id };
+                            statuses[idx] = { status: 'update', existingGameId: existing.id, moved: existing.date !== g.date };
                         }
                     }
                 });
@@ -418,7 +419,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                     setStep('review-games');
                                     // Set initial selected games based on resolved mappings, skip duplicates
                                     const toSelect = new Set<number>();
-                                    const statuses: Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string }> = {};
+                                    const statuses: Record<number, { status: 'new' | 'update' | 'same', existingGameId?: string, moved?: boolean }> = {};
 
                                     const matchedIds = matchScraped(scrapedGames, sportMappings, existingGames);
                                     scrapedGames.forEach((g, idx) => {
@@ -432,13 +433,14 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                         } else {
                                             const isSame =
                                                 existing.opponent.toLowerCase() === g.opponent.toLowerCase() &&
-                                                (existing.time === g.time || (!existing.time && !g.time)) &&
+                                                existing.date === g.date &&
+                            ((existing.time || '').trim() === g.time.trim() || (!existing.time && !g.time)) &&
                                                 existing.location === g.location;
 
                                             if (isSame) {
                                                 statuses[idx] = { status: 'same', existingGameId: existing.id };
                                             } else {
-                                                statuses[idx] = { status: 'update', existingGameId: existing.id };
+                                                statuses[idx] = { status: 'update', existingGameId: existing.id, moved: existing.date !== g.date };
                                             }
                                         }
                                     });
@@ -544,7 +546,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                                             <div className="font-bold text-gray-900 truncate flex items-center gap-2">
                                                                 {game.opponent}
                                                                 {game.description && <span className="bg-[#FFB81C] text-[#154734] text-[8px] px-1 rounded font-black uppercase">Theme</span>}
-                                                                {s.status === 'update' && <span className="bg-blue-100 text-blue-600 text-[8px] px-1 rounded font-black uppercase">New Info</span>}
+                                                                {s.status === 'update' && <span className="bg-blue-100 text-blue-600 text-[8px] px-1 rounded font-black uppercase">{(s as any).moved ? 'Moved (date changed)' : 'New Info'}</span>}
                                                             </div>
                                                             <div className="text-xs text-gray-500">
                                                                 {game.sportName} • {parseLocalDate(game.date).toLocaleDateString()} at {game.time}
@@ -554,6 +556,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                                                     <div className="font-bold text-blue-800 mb-1">Current Tracker Info:</div>
                                                                     <div className="grid grid-cols-2 gap-x-2 text-blue-700/80">
                                                                         <span>Opponent: {existing.opponent}</span>
+                                                                        {existing.date !== game.date && <span>Date: {parseLocalDate(existing.date).toLocaleDateString()}</span>}
                                                                         <span>Time: {existing.time || 'TBA'}</span>
                                                                         <span>Loc: {existing.location}</span>
                                                                     </div>

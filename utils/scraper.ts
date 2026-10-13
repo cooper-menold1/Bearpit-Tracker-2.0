@@ -77,7 +77,7 @@ export const fetchSchedule = async (year: number, month: number): Promise<Scrape
                         location = 'Neutral';
                     }
 
-                    const time = event.time || 'TBA';
+                    const time = event.time?.trim() || 'TBA';
                     const description = event.gamePromotionText || '';
 
                     games.push({
@@ -147,7 +147,8 @@ export interface SlotQuery { sportKey: string | undefined; date: string; time?: 
  * Match scraped games to existing games by sport + date + start time, so doubleheaders
  * stay separate. Passes (each existing game is claimed at most once):
  *  1. same start time; 2. same opponent (covers TBA/missing or changed times);
- *  3. the lone leftover game on that sport/day (opponent/time changed).
+ *  3. the lone leftover game on that sport/day (opponent/time changed);
+ *  4. moved: same sport + opponent within +-21 days where that (sport, opponent, date) is no longer scraped.
  * Returns the matched existing id (or null) for each query, in order.
  * Keep in sync with matchGames in supabase/functions/autofill-schedule/index.ts.
  */
@@ -167,6 +168,22 @@ export const matchGamesToExisting = (queries: SlotQuery[], existing: SlotCandida
     run((q, c) => {
         const n = queries.filter((o, j) => !result[j] && o.sportKey === q.sportKey && o.date === q.date).length;
         return c.length === 1 && n === 1 ? c[0] : undefined;
+    });
+    // Pass 4: moved games (date changed on the site).
+    const dayNum = (d: string) => Date.parse(d + 'T00:00:00Z') / 86400000;
+    const oppKey = (o: unknown) => String(o ?? '').trim().toLowerCase();
+    const scrapedKeys = new Set(queries.map(q => `${q.sportKey}|${oppKey(q.opponent)}|${q.date}`));
+    queries.forEach((q, i) => {
+        if (result[i] || !q.sportKey) return;
+        let best: SlotCandidate | undefined;
+        let bestDiff = Infinity;
+        for (const e of existing) {
+            if (claimed.has(e.id) || e.sportKey !== q.sportKey || oppKey(e.opponent) !== oppKey(q.opponent)) continue;
+            const diff = Math.abs(dayNum(e.date) - dayNum(q.date));
+            if (!(diff <= 21) || scrapedKeys.has(`${e.sportKey}|${oppKey(e.opponent)}|${e.date}`)) continue;
+            if (diff < bestDiff) { best = e; bestDiff = diff; }
+        }
+        if (best) { result[i] = best.id; claimed.add(best.id); }
     });
     return result;
 };
