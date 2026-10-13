@@ -25,11 +25,12 @@
 --      called attendance_geofence_backup_20261013. Do this BEFORE the update.
 --      Once the update is committed, the old values can only be restored
 --      from this backup table.
---   3. Run SECTION 2 (update). It runs inside begin ... commit. Read the
---      "rows updated" count. It should match the preview count from step 1.
---      If it does not match, type  rollback;  instead of  commit;
---   4. Run the verification query at the bottom of section 2 if you want
---      to double-check.
+--   3. Run SECTION 2 (update). It starts a transaction (begin) and does NOT
+--      commit. Read the "UPDATE n" count and the mismatches number from its
+--      final select. The count should match the preview count from step 1
+--      and mismatches should be 0.
+--   4. Run SECTION 3 by itself: type  commit;  if the numbers look right,
+--      or  rollback;  if they do not. Nothing is saved until you do this.
 --
 -- Rollback (after commit):
 --   The update cannot be undone by itself because the old values are gone.
@@ -104,7 +105,7 @@ select count(*) as backup_rows from attendance_geofence_backup_20261013;
 
 
 -- ----------------------------------------------------------------------------
--- SECTION 2: UPDATE (run as one block, inside begin ... commit)
+-- SECTION 2: UPDATE (run as one block; leaves the transaction OPEN, see section 3)
 --
 -- distance_meters = haversine distance (meters) from the OSM point of the
 --                   Paul L. Foster Campus meeting venue,
@@ -142,12 +143,8 @@ from (
 ) as h
 where a.ctid = h.row_id;
 
--- Check the "UPDATE n" count shown by the editor against rows_to_update.
--- If it matches, type  commit;  If it does not, type  rollback;
-commit;
-
--- Verification (read only): should show no rows where the flag disagrees
--- with the distance and accuracy rules.
+-- Verification (read only, inside the open transaction): should show 0
+-- mismatches, and the "UPDATE n" count above should equal rows_to_update.
 select count(*) as mismatches
 from attendance
 where game_id like 'meeting%'
@@ -158,6 +155,16 @@ where game_id like 'meeting%'
       else (distance_meters - least(accuracy_meters, 100)) <= 1000
     end
   );
+
+
+-- ----------------------------------------------------------------------------
+-- SECTION 3: FINISH (run this by itself, AFTER reading section 2's results)
+-- Numbers look right: run  commit;
+-- Numbers look wrong:  run  rollback;  instead (and do not run commit).
+-- ----------------------------------------------------------------------------
+
+commit;
+-- rollback;
 
 
 -- ----------------------------------------------------------------------------

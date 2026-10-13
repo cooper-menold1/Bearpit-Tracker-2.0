@@ -183,9 +183,15 @@ Deno.serve(async () => {
     // newly-posted game regardless of when in the month it lands.
     const now = new Date();
     const scraped: ScrapedGame[] = [];
+    const monthKeys: string[] = [];
+    const monthCounts = new Map<string, number>(); // YYYY-MM -> events fetched for that month
     for (let i = 0; i < 3; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      scraped.push(...(await fetchMonth(d.getFullYear(), d.getMonth() + 1, log)));
+      const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const got = await fetchMonth(d.getFullYear(), d.getMonth() + 1, log);
+      monthKeys.push(mk);
+      monthCounts.set(mk, got.length);
+      scraped.push(...got);
     }
 
     const sports = existingSports ?? [];
@@ -257,14 +263,22 @@ Deno.serve(async () => {
     let pruned = 0;
     let staleKept = 0;
     const matchedSet = new Set(matchedIds.filter(Boolean));
-    const coveredSports = new Set(scraped.map((g) => sportFor(g)?.id).filter(Boolean));
+    // Coverage is per sport AND month: a partial or empty month (e.g. a proxy returning "[]")
+    // must never be read as "those games were removed", or real games would be deleted.
+    const coveredSportMonths = new Set(
+      scraped.map((g) => { const sp = sportFor(g)?.id; return sp ? `${sp}|${String(g.date).slice(0, 7)}` : null; }).filter(Boolean) as string[],
+    );
+    for (const mk of monthKeys) {
+      if ((monthCounts.get(mk) ?? 0) === 0) log.push(`Prune skipped for ${mk}: fetch returned 0 events.`);
+    }
     const todayChicago = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date());
     const winEndD = new Date(now.getFullYear(), now.getMonth() + 3, 0);
     const winEnd = `${winEndD.getFullYear()}-${String(winEndD.getMonth() + 1).padStart(2, "0")}-${String(winEndD.getDate()).padStart(2, "0")}`;
     const stale = snapshot.filter((e: any) =>
       (String(e.id).startsWith("scraped_") || String(e.id).startsWith("autofill_"))
       && e.date >= todayChicago && e.date <= winEnd
-      && coveredSports.has(e.sport_id)
+      && (monthCounts.get(String(e.date).slice(0, 7)) ?? 0) > 0
+      && coveredSportMonths.has(`${e.sport_id}|${String(e.date).slice(0, 7)}`)
       && !matchedSet.has(e.id));
     if (stale.length > 0) {
       const withAttendance = new Set<string>();

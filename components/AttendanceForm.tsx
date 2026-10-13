@@ -4,7 +4,7 @@ import { Member, Game, Sport } from '../types';
 import { PrivacyLink } from './PrivacyPolicy';
 import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { VENUES } from '../constants';
-import { todayInChicago, formatGameTime } from '../utils/dateUtils';
+import { todayInChicago, formatGameTime, timeSortKey } from '../utils/dateUtils';
 import { SelfieUpload } from './SelfieUpload';
 import { getDistance, getCurrentPosition, geofenceStatus, isInAppBrowser, APPROX_ACCURACY_METERS } from '../utils/location';
 
@@ -55,7 +55,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
     const todayStr = todayInChicago(); // YYYY-MM-DD, Central time
     const todaysGames = games
         .filter(g => g.date === todayStr)
-        .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
+        .sort((a, b) => timeSortKey(a.time).localeCompare(timeSortKey(b.time)));
 
     const shareLocation = async (gameId: string) => {
         const myId = ++requestIdRef.current;

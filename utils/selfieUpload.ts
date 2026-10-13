@@ -33,6 +33,19 @@ export const compressImage = (file: File): Promise<Blob> =>
         img.src = url;
     });
 
+/**
+ * Best-effort orphan cleanup. The storage policy is INSERT-only (deliberately, so nobody can
+ * delete photos), so this will usually fail. Orphans may remain and can be cleaned from the
+ * Supabase dashboard. Never throws, never masks the original error.
+ */
+const removeBestEffort = async (path: string): Promise<void> => {
+    try {
+        await supabase.storage.from(BUCKET).remove([path]);
+    } catch {
+        // ignore
+    }
+};
+
 /** Returns an error message, or null on success. */
 export const uploadSelfie = async ({
     file,
@@ -63,20 +76,19 @@ export const uploadSelfie = async ({
     const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
     const publicUrl = pub?.publicUrl;
     if (!publicUrl) {
-        await supabase.storage.from(BUCKET).remove([path]);
+        await removeBestEffort(path);
         return 'Upload failed: could not get photo URL.';
     }
 
     const { error: insErr } = await supabase.from('selfies').insert({
-        id: 'selfie_' + Date.now() + '_0',
+        id: 'selfie_' + Date.now() + '_' + random6,
         member_id: memberId,
         game_id: gameId,
         image_data: publicUrl,
         timestamp: new Date().toISOString(),
     });
     if (insErr) {
-        // Clean up the orphaned object.
-        await supabase.storage.from(BUCKET).remove([path]);
+        await removeBestEffort(path);
         return `Could not save selfie: ${insErr.message}`;
     }
     return null;
