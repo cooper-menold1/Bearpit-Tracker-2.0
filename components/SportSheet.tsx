@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Game, Member, AttendanceRecord, Role } from '../types';
 import { Calendar, MapPin, Trophy, CheckCircle2, Circle } from 'lucide-react';
-import { formatFriendlyDate } from '../utils/dateUtils';
+import { formatFriendlyDate, timeSortKey } from '../utils/dateUtils';
 
 interface SportSheetProps {
   sportName: string;
@@ -24,7 +24,7 @@ export const SportSheet: React.FC<SportSheetProps> = ({
   const [tempThreshold, setTempThreshold] = useState(attendanceThreshold * 100);
 
   const sortedGames = useMemo(() => {
-    return [...games].sort((a, b) => a.date.localeCompare(b.date));
+    return [...games].sort((a, b) => a.date.localeCompare(b.date) || timeSortKey(a.time).localeCompare(timeSortKey(b.time)));
   }, [games]);
 
   // Filter members who have selected this sport

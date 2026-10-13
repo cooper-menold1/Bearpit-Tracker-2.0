@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Member, Game, Role, Sport, BonusPoint, ClubEvent, EventSignup } from '../types';
 import { POINT_CATEGORIES } from '../constants';
 import { parseOutlookCSV } from '../utils/importUtils';
@@ -10,7 +10,7 @@ import { SettingsModal } from './SettingsModal';
 import { AutoFillModal } from './AutoFillModal';
 import { BugLog } from './BugLog';
 import { gamePointValue } from '../utils/fanTier';
-import { parseLocalDate, convertInputToCST } from '../utils/dateUtils';
+import { parseLocalDate, convertInputToCST, parseTimeTo24h, formatGameTime } from '../utils/dateUtils';
 
 interface ManagementProps {
     members: Member[];
@@ -271,6 +271,8 @@ export const Management: React.FC<ManagementProps> = ({
         setEditingId(m.id);
     };
 
+    const editingGameRef = useRef<Game | null>(null);
+
     const handleSaveGame = () => {
         try {
             console.log("Attempting to save game...", gameForm);
@@ -284,7 +286,14 @@ export const Management: React.FC<ManagementProps> = ({
             let cstDate = gameForm.date;
             let cstTime = gameForm.time;
 
+            // Officer left time blank on a game whose original time was free text: keep it.
+            const orig = editingGameRef.current;
+            if (!gameForm.time && orig && orig.id === editingId && orig.time && !parseTimeTo24h(orig.time)) {
+                cstTime = orig.time;
+            }
+
             try {
+                if (!gameForm.time) throw new Error('skip');
                 const converted = convertInputToCST(
                     gameForm.date,
                     gameForm.time,
@@ -294,7 +303,7 @@ export const Management: React.FC<ManagementProps> = ({
                 cstTime = converted.time;
             } catch (dtError: any) {
                 // Fallback to raw if logic crashes
-                console.error("Date conversion failed", dtError);
+                if (dtError?.message !== 'skip') console.error("Date conversion failed", dtError);
             }
 
             const gameData: Game = {
@@ -318,10 +327,11 @@ export const Management: React.FC<ManagementProps> = ({
     };
 
     const handleEditGame = (g: Game) => {
+        editingGameRef.current = g;
         setGameForm({
             sportId: g.sportId,
             date: g.date,
-            time: g.time ? g.time.slice(0, 5) : '',
+            time: parseTimeTo24h(g.time || '') || '',
             timeZone: 'America/Chicago', // Existing games are stored in CST
             opponent: g.opponent,
             location: g.location,
@@ -451,7 +461,7 @@ export const Management: React.FC<ManagementProps> = ({
                                                             </div>
                                                             <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
                                                                 <span className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                                    <History className="w-3 h-3" /> {game.time || 'TBA'}
+                                                                    <History className="w-3 h-3" /> {formatGameTime(game.time)}
                                                                 </span>
                                                                 <span className={`px-1.5 py-0.5 rounded ${game.location === 'Home' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                                     {game.location}

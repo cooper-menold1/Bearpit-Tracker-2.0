@@ -52,6 +52,8 @@ export const isSameDay = (dateStr1: string, dateStr2: string): boolean => {
  */
 export const convertInputToCST = (dateStr: string, timeStr: string, sourceTimeZone: string): { date: string, time: string } => {
   if (!dateStr || !timeStr) return { date: dateStr, time: timeStr };
+  // Only convert real 24h HH:MM values. Anything else is returned untouched.
+  if (!/^\d{2}:\d{2}$/.test(timeStr)) return { date: dateStr, time: timeStr };
 
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -134,3 +136,39 @@ export const addDaysToDateStr = (dateStr: string, days: number): string => {
   d.setDate(d.getDate() + days);
   return formatLocalDate(d);
 };
+
+/**
+ * Parses free-text game times ("7 p.m.", "6:30 PM", "10 am", "2 p.m. CT", "17:30")
+ * into 24h "HH:MM". Returns null for TBA/TBD/empty/unparseable text.
+ */
+export const parseTimeTo24h = (t: string): string | null => {
+  if (!t) return null;
+  const m = t.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*(?:CT|CST|CDT)?$/i);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = m[2] !== undefined ? Number(m[2]) : 0;
+  const mer = m[3] ? m[3].toLowerCase().replace(/\./g, '') : null;
+  if (min > 59) return null;
+  if (mer) {
+    if (h < 1 || h > 12) return null;
+    if (mer === 'am') h = h === 12 ? 0 : h;
+    else h = h === 12 ? 12 : h + 12;
+  } else {
+    // No am/pm: only accept an explicit 24h HH:MM
+    if (m[2] === undefined || h > 23) return null;
+  }
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+};
+
+/** Display string for a game time: "5:30 PM", "TBA" if empty, else the trimmed original. */
+export const formatGameTime = (t?: string | null): string => {
+  if (!t || !t.trim()) return 'TBA';
+  const p = parseTimeTo24h(t);
+  if (!p) return t.trim();
+  const [h, m] = p.split(':').map(Number);
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
+/** Sort key for a game time: 24h "HH:MM", or "99:99" when unparseable. */
+export const timeSortKey = (t?: string | null): string => parseTimeTo24h(t || '') || '99:99';

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Game, Sport } from '../types';
 import { ChevronLeft, ChevronRight, Trophy, List, Calendar } from 'lucide-react';
-import { formatLocalDate, parseLocalDate, todayInChicago } from '../utils/dateUtils';
+import { formatLocalDate, parseLocalDate, todayInChicago, formatGameTime, timeSortKey } from '../utils/dateUtils';
 
 interface GameCalendarProps {
     games: Game[];
@@ -29,7 +29,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
 
     // Sort games for list view
     // Dates are YYYY-MM-DD strings; compare as strings (new Date() would parse them as UTC).
-    const sortedGames = [...filteredGames].sort((a, b) => a.date.localeCompare(b.date));
+    const sortedGames = [...filteredGames].sort((a, b) => a.date.localeCompare(b.date) || timeSortKey(a.time).localeCompare(timeSortKey(b.time)));
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full">
@@ -147,7 +147,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                                                 className={`text-[10px] px-1.5 py-1 rounded border shadow-sm truncate flex items-center gap-1 ${game.location === 'Home' ? 'bg-green-50 border-green-200 text-green-800' :
                                                     game.location === 'Away' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-gray-50 border-gray-200 text-gray-800'
                                                     }`}
-                                                title={`${game.opponent} (${game.time})`}
+                                                title={`${game.opponent} (${formatGameTime(game.time)})`}
                                             >
                                                 {game.isBonus && <Trophy className="w-2 h-2 text-[#FFB81C] shrink-0" />}
                                                 <span className="truncate font-semibold">{game.opponent}</span>
@@ -183,7 +183,7 @@ export const GameCalendar: React.FC<GameCalendarProps> = ({ games, sports, onDay
                                                     {sport?.name || game.sportId}
                                                 </span>
                                                 <span>•</span>
-                                                <span>{game.time}</span>
+                                                <span>{formatGameTime(game.time)}</span>
                                                 <span>•</span>
                                                 <span className={`${game.location === 'Home' ? 'text-green-600 font-bold' : 'text-red-500'}`}>{game.location}</span>
                                             </div>
