@@ -19,8 +19,6 @@ interface SelfieGalleryProps {
 export const SelfieGallery: React.FC<SelfieGalleryProps> = ({
     isOpen, onClose, selfies, members, games, sports, onDelete, onVote, bonusPoints, currentMember, selfieVotes
 }) => {
-    if (!isOpen) return null;
-
     const getMemberName = (id: string) => {
         const m = members.find(mem => mem.id === id);
         return m ? `${m.firstName} ${m.lastName}` : 'Unknown Member';
@@ -46,6 +44,8 @@ export const SelfieGallery: React.FC<SelfieGalleryProps> = ({
 
         return data;
     }, [selfies, games, sports]);
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -128,7 +128,7 @@ const SportSection: React.FC<{
                     {Object.entries(gamesData).sort((a, b) => {
                         const gameA = games.find(g => g.id === a[0]);
                         const gameB = games.find(g => g.id === b[0]);
-                        return (new Date(gameB?.date || 0).getTime() - new Date(gameA?.date || 0).getTime());
+                        return (gameB?.date || '').localeCompare(gameA?.date || '');
                     }).map(([gameId, photos]) => {
                         const game = games.find(g => g.id === gameId);
                         return (
@@ -196,7 +196,7 @@ const PhotoCard: React.FC<{
                     {isAdmin && (
                         <button
                             type="button"
-                            onClick={() => onDelete(photo.id, photo.imageData)}
+                            onClick={() => { if (window.confirm('Delete this photo permanently?')) onDelete(photo.id, photo.imageData); }}
                             className="bg-red-500 text-white p-1.5 rounded-md hover:bg-red-600 transform scale-90 active:scale-95"
                             title="Delete Photo"
                             aria-label="Delete photo"
