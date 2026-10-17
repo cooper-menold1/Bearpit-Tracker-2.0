@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Search, Check, AlertCircle, Loader2, Calendar as CalendarIcon, Info, Trophy, ChevronRight, Plus, MapPin, Clock } from 'lucide-react';
 import { Game, Sport, Role } from '../types';
 import { fetchSchedule, ScrapedGame, resolveSportMappings, matchGamesToExisting } from '../utils/scraper';
+import { isPremiumGame } from '../utils/premium';
 import { parseLocalDate, formatLocalDate, todayInChicago, addDaysToDateStr } from '../utils/dateUtils';
 
 // Match by sport + date + start time (opponent fallback), so doubleheaders stay separate.
@@ -92,7 +93,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                             ((existing.time || '').trim() === g.time.trim() || (!existing.time && !g.time)) &&
                             existing.location === g.location;
 
-                        if (isSame) {
+                        if (isSame && !(isPremiumGame(g.sportName, g.date) && !existing.isBonus)) {
                             statuses[idx] = { status: 'same', existingGameId: existing.id };
                         } else {
                             statuses[idx] = { status: 'update', existingGameId: existing.id, moved: existing.date !== g.date };
@@ -194,7 +195,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                     time: g.time,
                     opponent: g.opponent,
                     location: g.location,
-                    isBonus: prior ? prior.isBonus : false,
+                    isBonus: (prior?.isBonus ?? false) || isPremiumGame(g.sportName, g.date),
                     pointsValue: prior ? prior.pointsValue : 1,
                     description: g.description
                 });
@@ -437,7 +438,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                             ((existing.time || '').trim() === g.time.trim() || (!existing.time && !g.time)) &&
                                                 existing.location === g.location;
 
-                                            if (isSame) {
+                                            if (isSame && !(isPremiumGame(g.sportName, g.date) && !existing.isBonus)) {
                                                 statuses[idx] = { status: 'same', existingGameId: existing.id };
                                             } else {
                                                 statuses[idx] = { status: 'update', existingGameId: existing.id, moved: existing.date !== g.date };
@@ -545,6 +546,7 @@ export const AutoFillModal: React.FC<AutoFillModalProps> = ({ isOpen, onClose, e
                                                         <div>
                                                             <div className="font-bold text-gray-900 truncate flex items-center gap-2">
                                                                 {game.opponent}
+                                                                {isPremiumGame(game.sportName, game.date) && <Trophy className="w-3 h-3 text-[#FFB81C] shrink-0" aria-label="Premium game"><title>Premium game</title></Trophy>}
                                                                 {game.description && <span className="bg-[#FFB81C] text-[#154734] text-[8px] px-1 rounded font-black uppercase">Theme</span>}
                                                                 {s.status === 'update' && <span className="bg-blue-100 text-blue-600 text-[8px] px-1 rounded font-black uppercase">{(s as any).moved ? 'Moved (date changed)' : 'New Info'}</span>}
                                                             </div>

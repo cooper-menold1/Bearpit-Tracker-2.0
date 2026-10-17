@@ -13,12 +13,31 @@
 //   place when the scraped opponent/time/location differs, so the tracker
 //   stays current with baylorbears.com without needing a manual re-run of
 //   AutoFillModal.
+// - Premium games (Fall 2026 point framework) are marked is_bonus = true on insert, and
+//   upgraded false -> true on existing rows. It never sets an existing true back to false.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const PRUNE_STALE = Deno.env.get("AUTOFILL_PRUNE_STALE") !== "false";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+// Premium games (is_bonus = true, worth 2 points). Source: Fall 2026 BearPit Point
+// Incentive Framework; update each semester.
+// KEEP IN SYNC with utils/premium.ts (this file cannot import from the app).
+// Keyed by the scraped baylorbears.com sport title, not sport_id.
+const PREMIUM_GAMES: Record<string, string[]> = {
+  "Volleyball": ["2026-09-05", "2026-10-02", "2026-10-04", "2026-10-25", "2026-10-30", "2026-11-20", "2026-11-28"],
+  "Soccer": ["2026-10-02", "2026-10-16"],
+  "Women's Basketball": ["2026-11-02"],
+};
+const normSport = (s: string) => s.trim().toLowerCase().replace(/’/g, "'");
+const PREMIUM_BY_SPORT: Record<string, string[]> = Object.fromEntries(
+  Object.entries(PREMIUM_GAMES).map(([k, v]) => [normSport(k), v]),
+);
+function isPremiumGame(sportName: string, date: string): boolean {
+  return (PREMIUM_BY_SPORT[normSport(sportName)] ?? []).includes(date);
+}
 
 interface ScrapedGame {
   date: string;
@@ -197,6 +216,7 @@ Deno.serve(async () => {
     const sports = existingSports ?? [];
     let added = 0;
     let updated = 0;
+    let premiumMarked = 0;
     let skippedUnknownSport = 0;
 
     const sportFor = (g: ScrapedGame) =>
@@ -223,7 +243,8 @@ Deno.serve(async () => {
           && existing.date === g.date
           && ((existing.time || "").trim() === g.time.trim() || (!existing.time && !g.time))
           && existing.location === g.location;
-        if (same) continue;
+        const premiumUpgrade = isPremiumGame(g.sportName, g.date) && !existing.is_bonus;
+        if (same && !premiumUpgrade) continue;
 
         const { error: updErr } = await supabase.from("games").update({
           opponent: g.opponent,
@@ -231,8 +252,11 @@ Deno.serve(async () => {
           time: g.time.trim(),
           location: g.location,
           description: g.description,
+          ...(premiumUpgrade ? { is_bonus: true } : {}),
         }).eq("id", existing.id);
         if (updErr) { log.push(`Failed to update game ${g.sportName} ${g.date}: ${updErr.message}`); continue; }
+        if (premiumUpgrade) { premiumMarked++; log.push(`Marked premium ${g.sportName} ${g.date} (${existing.id})`); }
+        if (same) continue;
         updated++;
         log.push(`Updated ${g.sportName} ${g.date}: was ${existing.date} "${existing.opponent}"/${existing.time}/${existing.location} -> "${g.opponent}"/${g.time}/${g.location}`);
         continue;
@@ -250,7 +274,7 @@ Deno.serve(async () => {
         time: g.time,
         opponent: g.opponent,
         location: g.location,
-        is_bonus: false,
+        is_bonus: isPremiumGame(g.sportName, g.date),
         points_value: 1,
         description: g.description,
       });
@@ -302,10 +326,10 @@ Deno.serve(async () => {
       }
     }
 
-    const summary = `Autofill run ${new Date().toISOString()}: +${added} new games, ${updated} games updated, ${pruned} stale pruned (${staleKept} stale kept), ${skippedUnknownSport} events skipped (no matching known sport).`;
+    const summary = `Autofill run ${new Date().toISOString()}: +${added} new games, ${updated} games updated, ${premiumMarked} marked premium, ${pruned} stale pruned (${staleKept} stale kept), ${skippedUnknownSport} events skipped (no matching known sport).`;
     console.log(summary, log.join(" | "));
 
-    return new Response(JSON.stringify({ ok: true, added, updated, pruned, staleKept, skippedUnknownSport, log }), {
+    return new Response(JSON.stringify({ ok: true, added, updated, premiumMarked, pruned, staleKept, skippedUnknownSport, log }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
