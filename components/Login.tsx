@@ -10,7 +10,7 @@ import { PrivacyLink } from './PrivacyPolicy';
 const CONFETTI_EMOJI = ['🏀', '🏈', '⚾', '🏐', '🎾', '⚽'];
 
 // TODO: fill in with the real Linktree/social URL once Cooper has it.
-const SOCIAL_URL = '';
+const SOCIAL_URL = 'https://linktr.ee/BaylorBearPit';
 
 interface ConfettiPiece {
     id: number;

@@ -67,6 +67,9 @@ export const Management: React.FC<ManagementProps> = ({
     const [emailBody, setEmailBody] = useState('');
 
     const currentMembersAndAbove = members.filter(m => m.role !== Role.PROSPECTIVE && m.role !== Role.INACTIVE);
+    // Officer mail list: everyone with the Officer or Admin role.
+    const officersAndAdmins = members.filter(m => m.role === Role.OFFICER || m.role === Role.ADMIN);
+    const allOfficersOnlySelected = officersAndAdmins.length > 0 && emailSelectedIds.size === officersAndAdmins.length && officersAndAdmins.every(m => emailSelectedIds.has(m.id));
 
     const toggleEmailSelected = (id: string) => {
         setEmailSelectedIds(prev => {
@@ -96,6 +99,15 @@ export const Management: React.FC<ManagementProps> = ({
         navigator.clipboard.writeText(emails.join('; ')).then(() => {
             setMemberEmailsCopied(true);
             setTimeout(() => setMemberEmailsCopied(false), 2000);
+        });
+    };
+
+    const [officerEmailsCopied, setOfficerEmailsCopied] = useState(false);
+    const copyOfficerEmails = () => {
+        const emails = officersAndAdmins.filter(m => m.email).map(m => m.email!);
+        navigator.clipboard.writeText(emails.join('; ')).then(() => {
+            setOfficerEmailsCopied(true);
+            setTimeout(() => setOfficerEmailsCopied(false), 2000);
         });
     };
 
@@ -640,6 +652,16 @@ export const Management: React.FC<ManagementProps> = ({
                                         {memberEmailsCopied ? 'Copied!' : 'Copy All Emails'}
                                     </button>
                                 )}
+                                {officersAndAdmins.some(m => m.email) && (
+                                    <button
+                                        onClick={copyOfficerEmails}
+                                        title="Copies every Officer/Admin's email, semicolon-separated -- paste into Outlook's To/Bcc field"
+                                        className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-200"
+                                    >
+                                        {officerEmailsCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                                        {officerEmailsCopied ? 'Copied!' : 'Copy Officer Emails'}
+                                    </button>
+                                )}
                             </div>
                             {showEmailCompose && (
                                 <span className="text-xs text-gray-500">
@@ -652,9 +674,17 @@ export const Management: React.FC<ManagementProps> = ({
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 shrink-0 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <h4 className="font-bold text-amber-900 text-sm">Compose (e.g. meeting notes)</h4>
-                                    <button onClick={toggleSelectAllCurrent} className="text-xs font-bold text-amber-700 hover:text-amber-900 underline">
-                                        {allCurrentSelected ? 'Deselect all Members+' : 'Select all Members+'}
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setEmailSelectedIds(allOfficersOnlySelected ? new Set() : new Set(officersAndAdmins.map(m => m.id)))}
+                                            className="text-xs font-bold text-amber-700 hover:text-amber-900 underline"
+                                        >
+                                            {allOfficersOnlySelected ? 'Deselect officers' : 'Officers only'}
+                                        </button>
+                                        <button onClick={toggleSelectAllCurrent} className="text-xs font-bold text-amber-700 hover:text-amber-900 underline">
+                                            {allCurrentSelected ? 'Deselect all Members+' : 'Select all Members+'}
+                                        </button>
+                                    </div>
                                 </div>
                                 <input
                                     type="text"
