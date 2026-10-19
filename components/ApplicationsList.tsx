@@ -272,6 +272,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                         <span className="text-xs text-gray-500 ml-2">No meeting check-in in {Math.round(ARCHIVE_AFTER_DAYS / 7)}+ weeks ({ARCHIVE_AFTER_DAYS} days).</span>
                     )}
                 </div>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 text-gray-700 uppercase text-xs">
                         <tr>
@@ -330,6 +331,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     );
