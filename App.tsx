@@ -10,6 +10,7 @@ import { QRCodeDisplay } from './components/QRCodeDisplay';
 import { SettingsModal } from './components/SettingsModal';
 import { ChantGallery } from './components/ChantGallery';
 import { supabase } from './utils/supabaseClient';
+import { splitApplications } from './utils/applicationArchive';
 
 // Lazily loaded: admin-only screens and on-demand modals. Splitting these out
 // (Dashboard alone pulls in recharts) keeps the initial bundle small for the
@@ -85,8 +86,8 @@ function App() {
     });
 
     const prospectiveCount = useMemo(
-        () => data.members.filter(m => m.role === Role.PROSPECTIVE).length,
-        [data.members]
+        () => splitApplications(data.members.filter(m => m.role === Role.PROSPECTIVE), data).active.length,
+        [data.members, data.games, data.sports, data.attendance]
     );
 
     useEffect(() => {

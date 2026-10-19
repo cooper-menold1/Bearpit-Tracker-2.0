@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, Role, EmailTemplate } from '../types';
 import { Users, Mail, Settings2, Save, Eye, EyeOff, Copy, Check, FileSpreadsheet } from 'lucide-react';
+import { splitApplications, ARCHIVE_AFTER_DAYS } from '../utils/applicationArchive';
 import { renderEmailTemplate, buildMailto, buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
 
 interface ApplicationsListProps {
@@ -21,7 +22,15 @@ const EMPTY_TEMPLATE: EmailTemplate = {
 };
 
 export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onApprove, onReject, onSaveTemplate }) => {
-    const prospective = data.members.filter(m => m.role === Role.PROSPECTIVE);
+    const allProspective = useMemo(() => data.members.filter(m => m.role === Role.PROSPECTIVE), [data.members]);
+    const { active, archived, statusById } = useMemo(() => splitApplications(allProspective, data), [allProspective, data]);
+    const [tab, setTab] = useState<'new' | 'archive'>('new');
+    const prospective = tab === 'new' ? active : archived;
+    const formatShortDate = (d: Date | null | undefined) => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
+    const switchTab = (next: 'new' | 'archive') => {
+        setTab(next);
+        setSelectedIds(new Set());
+    };
     const [form, setForm] = useState<EmailTemplate>(data.emailTemplate || EMPTY_TEMPLATE);
     const [showConfig, setShowConfig] = useState(!data.emailTemplate);
     const [showPreview, setShowPreview] = useState(false);
@@ -249,6 +258,20 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                         </div>
                     )}
                 </div>
+                <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+                    {([['new', `New (${active.length})`], ['archive', `Archive (${archived.length})`]] as const).map(([key, label]) => (
+                        <button
+                            key={key}
+                            onClick={() => switchTab(key)}
+                            className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${tab === key ? 'bg-[#154734] text-[#FFB81C]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                    {tab === 'archive' && (
+                        <span className="text-xs text-gray-500 ml-2">No meeting check-in in {Math.round(ARCHIVE_AFTER_DAYS / 7)}+ weeks ({ARCHIVE_AFTER_DAYS} days).</span>
+                    )}
+                </div>
                 <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 text-gray-700 uppercase text-xs">
                         <tr>
@@ -261,6 +284,8 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             <th className="px-6 py-3">Year</th>
                             <th className="px-6 py-3">Heard About</th>
                             <th className="px-6 py-3">Referred By</th>
+                            <th className="px-6 py-3">Applied</th>
+                            <th className="px-6 py-3">Last Meeting</th>
                             <th className="px-6 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -278,6 +303,8 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                                     <td className="px-6 py-4 text-gray-500">{m.year || '—'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.heardAbout || '—'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.referredBy || '—'}</td>
+                                    <td className="px-6 py-4 text-gray-500 whitespace-nowrap">{formatShortDate(statusById.get(m.id)?.appliedDate) || 'Unknown'}</td>
+                                    <td className="px-6 py-4 text-gray-500 whitespace-nowrap">{formatShortDate(statusById.get(m.id)?.lastMeetingDate) || '—'}</td>
                                     <td className="px-6 py-4 text-right whitespace-nowrap">
                                         {mailtoHref ? (
                                             <a
@@ -299,7 +326,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             );
                         })}
                         {prospective.length === 0 && (
-                            <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 italic">No pending applications.</td></tr>
+                            <tr><td colSpan={10} className="px-6 py-10 text-center text-gray-400 italic">{tab === 'new' ? 'No new applications.' : 'No archived applications.'}</td></tr>
                         )}
                     </tbody>
                 </table>
