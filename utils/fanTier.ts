@@ -1,4 +1,4 @@
-import { AppState, Game, Member, Role } from '../types';
+import { AppState, BonusPoint, Game, Member, Role } from '../types';
 import { POINT_CATEGORIES, FAN_TIERS } from '../constants';
 
 // The one rule for game points, used everywhere: 1 for attending, +1 if
@@ -16,7 +16,30 @@ export const computeLifetimeStats = (member: Member, data: AppState) => {
     });
 
     const myBonusPoints = data.bonusPoints.filter(b => b.memberId === member.id);
+    return buildLifetimeStats(member, gameAttendancePoints, myBonusPoints);
+};
 
+// Batch version for lists: groups bonus points once instead of filtering per
+// member. Returns the same tier computeLifetimeStats(member, data).tier would.
+export const computeLifetimeTiers = (data: AppState) => {
+    const bonusByMember = new Map<string, BonusPoint[]>();
+    data.bonusPoints.forEach(b => {
+        const list = bonusByMember.get(b.memberId);
+        if (list) list.push(b);
+        else bonusByMember.set(b.memberId, [b]);
+    });
+    const tiers = new Map<string, ReturnType<typeof computeLifetimeStats>['tier']>();
+    data.members.forEach(member => {
+        let gameAttendancePoints = 0;
+        data.games.forEach(g => {
+            if (data.attendance[g.id]?.[member.id]) gameAttendancePoints += gamePointValue(g);
+        });
+        tiers.set(member.id, buildLifetimeStats(member, gameAttendancePoints, bonusByMember.get(member.id) || []).tier);
+    });
+    return tiers;
+};
+
+const buildLifetimeStats = (member: Member, gameAttendancePoints: number, myBonusPoints: BonusPoint[]) => {
     const categories = [
         { name: 'Game Attendance', points: gameAttendancePoints, icon: 'game' as const },
         ...POINT_CATEGORIES.map(name => ({
@@ -25,7 +48,6 @@ export const computeLifetimeStats = (member: Member, data: AppState) => {
             icon: 'category' as const,
         })),
     ];
-
     const totalPoints = categories.reduce((sum, c) => sum + c.points, 0)
         + (member.role === Role.ADMIN || member.role === Role.OFFICER ? 5 : 0);
 

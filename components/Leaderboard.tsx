@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { AppState, Role } from '../types';
+import { AppState, BonusPoint, Role } from '../types';
 import { Trophy, Medal, Filter, TrendingUp, Users, CalendarRange } from 'lucide-react';
 import { POINT_CATEGORIES } from '../constants';
 import { semesterOf, currentSemester, listSemesters } from '../utils/semester';
-import { computeLifetimeStats, gamePointValue } from '../utils/fanTier';
+import { computeLifetimeTiers, gamePointValue } from '../utils/fanTier';
 
 const GAME_ATTENDANCE = 'Game Attendance';
 const ALL_CATEGORIES = 'all';
@@ -23,23 +23,35 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
         [data.games, data.bonusPoints]
     );
     // Leaderboard spots are earned per semester; lifetime points only set the fan level badge.
-    const inSemester = (dateStr: string) => semesterOf(dateStr).key === semesterKey;
 
     // Category view only ranks by points; the sport filter only applies to game points.
     const categoryView = leaderboardType === 'points' && category !== ALL_CATEGORIES;
     const showSportFilter = !categoryView || category === GAME_ATTENDANCE;
 
+    // Fan levels depend only on lifetime data, not the filters.
+    const lifetimeTiers = useMemo(() => computeLifetimeTiers(data), [data]);
+
     const leaderboard = useMemo(() => {
+        // Games passing the sport + semester filters (semester computed once per game).
+        const games = data.games.filter(game =>
+            (filterSportId === 'all' || game.sportId === filterSportId)
+            && semesterOf(game.date).key === semesterKey
+        );
+        // Bonus points in the selected semester, grouped by member (original order kept).
+        const bonusByMember = new Map<string, BonusPoint[]>();
+        data.bonusPoints?.forEach(bp => {
+            if (semesterOf(bp.date).key !== semesterKey) return;
+            const list = bonusByMember.get(bp.memberId);
+            if (list) list.push(bp);
+            else bonusByMember.set(bp.memberId, [bp]);
+        });
+
         const rows = data.members.map(member => {
             let gamePoints = 0;
             let gamesAttended = 0;
 
             // 1. Calculate Game Points & Attendance
-            data.games.forEach(game => {
-                // Apply Sport + Semester Filters
-                if (filterSportId !== 'all' && game.sportId !== filterSportId) return;
-                if (!inSemester(game.date)) return;
-
+            games.forEach(game => {
                 if (data.attendance[game.id]?.[member.id]) {
                     gamePoints += gamePointValue(game);
                     gamesAttended++;
@@ -49,12 +61,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
             // 2. Calculate Bonus Points (Manual)
             let bonusPoints = 0;
             const byCategory: Record<string, number> = { [GAME_ATTENDANCE]: gamePoints };
-            data.bonusPoints?.forEach(bp => {
-                if (bp.memberId === member.id && inSemester(bp.date)) {
-                    bonusPoints += bp.points;
-                    const cat = bp.category || 'Other';
-                    byCategory[cat] = (byCategory[cat] || 0) + bp.points;
-                }
+            bonusByMember.get(member.id)?.forEach(bp => {
+                bonusPoints += bp.points;
+                const cat = bp.category || 'Other';
+                byCategory[cat] = (byCategory[cat] || 0) + bp.points;
             });
             // Bonus points aren't tied to a sport, so a sport filter drops them.
             if (filterSportId !== 'all') bonusPoints = 0;
@@ -65,7 +75,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                 bonusPoints,
                 gamesAttended,
                 categoryPoints: byCategory[category] || 0,
-                fanLevel: computeLifetimeStats(member, data).tier,
+                fanLevel: lifetimeTiers.get(member.id)!,
                 totalPoints: gamePoints + bonusPoints
             };
         });
@@ -85,7 +95,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                     return b.totalPoints - a.totalPoints;
                 }
             });
-    }, [data, filterSportId, leaderboardType, semesterKey, category]);
+    }, [data, lifetimeTiers, filterSportId, leaderboardType, semesterKey, category]);
 
     // Top 3 Styling
     const getRankStyle = (index: number) => {

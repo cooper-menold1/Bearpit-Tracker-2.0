@@ -11,6 +11,8 @@ const SEMESTER_STARTS: { label: string; start: string }[] = [
     { label: 'Fall 2027', start: '2027-08-23' },
 ];
 
+const SEMESTER_STARTS_DESC = [...SEMESTER_STARTS].reverse();
+
 export interface Semester {
     key: string; // sorts chronologically, e.g. "2026-2-Fall"
     label: string; // e.g. "Fall 2026"
@@ -26,7 +28,7 @@ export const semesterOf = (dateStr: string): Semester => {
     const first = SEMESTER_STARTS[0].start;
     const last = SEMESTER_STARTS[SEMESTER_STARTS.length - 1].start;
     if (d >= first && d < last) {
-        const match = [...SEMESTER_STARTS].reverse().find(s => d >= s.start)!;
+        const match = SEMESTER_STARTS_DESC.find(s => d >= s.start)!;
         return toSemester(match.label);
     }
     const year = Number(d.slice(0, 4));
