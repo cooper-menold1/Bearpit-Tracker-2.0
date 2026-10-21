@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Member, Game, Role, Sport, BonusPoint, ClubEvent, EventSignup } from '../types';
 import { POINT_CATEGORIES } from '../constants';
 import { parseOutlookCSV } from '../utils/importUtils';
-import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet, Search } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet, Search, RefreshCw } from 'lucide-react';
 import { buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
 import { matchSignups } from '../utils/signupImport';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
-import { AutoFillModal } from './AutoFillModal';
-import { BugLog } from './BugLog';
 import { gamePointValue } from '../utils/fanTier';
 import { parseLocalDate, convertInputToCST, parseTimeTo24h, formatGameTime } from '../utils/dateUtils';
+
+const AutoFillModal = lazy(() => import('./AutoFillModal').then(m => ({ default: m.AutoFillModal })));
+const BugLog = lazy(() => import('./BugLog').then(m => ({ default: m.BugLog })));
 
 interface ManagementProps {
     members: Member[];
@@ -56,6 +57,9 @@ export const Management: React.FC<ManagementProps> = ({
     const [activeTab, setActiveTab] = useState<'members' | 'games' | 'points' | 'events' | 'bugs'>('games');
     const [selectedProfileMember, setSelectedProfileMember] = useState<Member | null>(null);
     const [showAutoFill, setShowAutoFill] = useState(false);
+    // Mount the lazy AutoFillModal only after its first open, then keep it mounted (preserves month/year/meetingConfig across close/reopen).
+    const [hasOpenedAutoFill, setHasOpenedAutoFill] = useState(false);
+    if (showAutoFill && !hasOpenedAutoFill) setHasOpenedAutoFill(true);
 
     // Bulk email: select members (e.g. everyone Member/Officer/Admin) and
     // compose one shared message -- for things like sending meeting notes
@@ -434,6 +438,8 @@ export const Management: React.FC<ManagementProps> = ({
                         />
 
                         {/* Auto-Fill Modal */}
+                        {hasOpenedAutoFill && (
+                        <Suspense fallback={null}>
                         <AutoFillModal
                             isOpen={showAutoFill}
                             onClose={() => setShowAutoFill(false)}
@@ -446,6 +452,8 @@ export const Management: React.FC<ManagementProps> = ({
                             })}
                             userRole={userRole}
                         />
+                        </Suspense>
+                        )}
 
                         {/* Day Details Modal (New) */}
                         {showDayDetails && selectedDate && (
@@ -1062,7 +1070,11 @@ export const Management: React.FC<ManagementProps> = ({
                 )}
 
                 {/* --- BUG LOG TAB --- */}
-                {activeTab === 'bugs' && <BugLog />}
+                {activeTab === 'bugs' && (
+                    <Suspense fallback={<div className="flex items-center justify-center py-12"><RefreshCw className="w-8 h-8 animate-spin text-green-700" /></div>}>
+                        <BugLog />
+                    </Suspense>
+                )}
             </div>
 
             {selectedProfileMember && (

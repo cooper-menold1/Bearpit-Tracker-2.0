@@ -1,16 +1,17 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, lazy, Suspense } from 'react';
 import { Member, AppState, Game, Role, ClubEvent } from '../types';
-import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus, Heart } from 'lucide-react';
+import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus, Heart, RefreshCw } from 'lucide-react';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
-import { Management } from './Management';
 import { Leaderboard } from './Leaderboard';
 import { SelfieContest } from './SelfieContest';
 import { FAN_TIERS } from '../constants';
 import { todayInChicago, parseLocalDate, formatGameTime, timeSortKey } from '../utils/dateUtils';
 import { computeLifetimeStats, gamePointValue } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
+
+const Management = lazy(() => import('./Management').then(m => ({ default: m.Management })));
 
 const formatUpcomingDate = (dateStr: string) =>
     parseLocalDate(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -231,6 +232,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 ) : view === 'edit_calendar' && canEdit && sports && onAddGame && onDeleteGame ? (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="bg-white p-4 rounded-xl border border-gray-200">
+                            <Suspense fallback={<div className="flex items-center justify-center py-12"><RefreshCw className="w-8 h-8 animate-spin text-green-700" /></div>}>
                             <Management
                                 members={[]}
                                 games={data.games}
@@ -249,6 +251,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                 onDeleteClubEvent={onDeleteClubEvent}
                                 userRole={member.role}
                             />
+                            </Suspense>
                             <div className="mt-2 text-center text-xs text-gray-400">
                                 Restricted View: Member management &amp; the Points Manager tab are disabled in this portal. Use Club Events here to create tabling signups.
                             </div>
