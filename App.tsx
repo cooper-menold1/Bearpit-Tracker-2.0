@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
-import { INITIAL_STATE, LOGO_URL } from './constants';
+import { INITIAL_STATE, LOGO_URL, HIDDEN_MEMBER_IDS } from './constants';
 import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate, ClubEvent } from './types';
 import { Login } from './components/Login';
 import { AttendanceForm, AttendanceLocation } from './components/AttendanceForm';
@@ -146,7 +146,7 @@ function App() {
             attendanceMap[record.game_id][record.member_id] = true;
         });
 
-        const mappedMembers: Member[] = (members || []).map((m: any) => ({
+        const mappedMembers: Member[] = (members || []).filter((m: any) => !HIDDEN_MEMBER_IDS.includes(m.id)).map((m: any) => ({
             id: m.id,
             firstName: m.first_name,
             lastName: m.last_name,

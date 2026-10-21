@@ -46,6 +46,10 @@ export const FAN_TIERS = [
 // To re-enable, set it to the next meeting, e.g. 'Monday, Nov. 2'.
 export const NEXT_INTEREST_MEETING = '';
 
+// Preview accounts that can log in but never show up in rosters,
+// leaderboards, or admin member lists.
+export const HIDDEN_MEMBER_IDS = ['test_member_ui'];
+
 export const AUTHORIZED_USERS = [
   "Ben Jacob",
   "Anna Carrey",
