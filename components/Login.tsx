@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Member, Selfie, Role } from '../types';
 import { Music, QrCode, User, UserPlus, X } from 'lucide-react';
 import LOGO_V2 from '../assets/bearpit_logo_full_color.png';
@@ -88,9 +88,9 @@ export const Login: React.FC<LoginProps> = ({ members, onLogin, onGuest, onChant
         onLogin(member, password);
     };
 
-    const recentSelfies = [...selfies]
+    const recentSelfies = useMemo(() => [...selfies]
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 18);
+        .slice(0, 18), [selfies]);
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">

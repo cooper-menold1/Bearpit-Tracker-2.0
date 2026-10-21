@@ -80,6 +80,19 @@ export const SportSheet: React.FC<SportSheetProps> = ({
     });
   }, [filteredMembers, games, attendance]);
 
+  const homeGamesCount = useMemo(() => games.filter(g => g.location === 'Home').length, [games]);
+
+  // Sorted copy for the report view (sorting memberStats in place mutated the memoized array during render)
+  const sortedMemberStats = useMemo(() => [...memberStats].sort((a, b) => {
+    // 1. Priority to those who picked this sport
+    const aPicked = a.fallSportId === sportId || a.springSportId === sportId;
+    const bPicked = b.fallSportId === sportId || b.springSportId === sportId;
+    if (aPicked && !bPicked) return -1;
+    if (!aPicked && bPicked) return 1;
+    // 2. Sort by lowest attendance
+    return a.percentage - b.percentage;
+  }), [memberStats, sportId]);
+
   return (
     <div className="flex flex-col h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col sticky top-0 z-10">
@@ -233,19 +246,8 @@ export const SportSheet: React.FC<SportSheetProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {memberStats
-                    .sort((a, b) => {
-                      // 1. Priority to those who picked this sport
-                      const aPicked = a.fallSportId === sportId || a.springSportId === sportId;
-                      const bPicked = b.fallSportId === sportId || b.springSportId === sportId;
-                      if (aPicked && !bPicked) return -1;
-                      if (!aPicked && bPicked) return 1;
-                      // 2. Sort by lowest attendance
-                      return a.percentage - b.percentage;
-                    })
-                    .map(member => {
+                  {sortedMemberStats.map(member => {
                       const isPrimary = member.fallSportId === sportId || member.springSportId === sportId;
-                      const homeGamesCount = games.filter(g => g.location === 'Home').length;
                       const statusColor = member.percentage >= 75 ? 'text-green-600' : member.percentage >= 50 ? 'text-yellow-600' : 'text-red-500';
 
                       return (

@@ -18,6 +18,19 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) {
+              if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react-vendor';
+              if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(id) || /[\\/]node_modules[\\/](iceberg-js|tslib)[\\/]/.test(id)) return 'supabase-vendor';
+            }
+            return undefined;
+          }
+        }
+      }
     }
   };
 });
