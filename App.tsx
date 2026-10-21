@@ -236,19 +236,35 @@ function App() {
 
     useEffect(() => {
         fetchData();
+        // Realtime events arrive in bursts (game-day check-ins, bulk awards). Coalesce them with a
+        // short trailing debounce so a burst triggers one refetch instead of one per event.
+        let coreTimer: ReturnType<typeof setTimeout> | undefined;
+        let selfiesTimer: ReturnType<typeof setTimeout> | undefined;
+        const scheduleCoreRefetch = () => {
+            clearTimeout(coreTimer);
+            coreTimer = setTimeout(() => { fetchCoreData(); }, 300);
+        };
+        const scheduleSelfiesRefetch = () => {
+            clearTimeout(selfiesTimer);
+            selfiesTimer = setTimeout(() => { fetchSelfies(); }, 300);
+        };
         const channels = supabase
             .channel('custom-all-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchCoreData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => fetchCoreData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => fetchCoreData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'sports' }, () => fetchCoreData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'selfies' }, () => fetchSelfies())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'email_templates' }, () => fetchCoreData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_points' }, () => fetchCoreData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'club_events' }, () => fetchCoreData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'event_signups' }, () => fetchCoreData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => scheduleCoreRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => scheduleCoreRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => scheduleCoreRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'sports' }, () => scheduleCoreRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'selfies' }, () => scheduleSelfiesRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'email_templates' }, () => scheduleCoreRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_points' }, () => scheduleCoreRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'club_events' }, () => scheduleCoreRefetch())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'event_signups' }, () => scheduleCoreRefetch())
             .subscribe();
-        return () => { supabase.removeChannel(channels); };
+        return () => {
+            clearTimeout(coreTimer);
+            clearTimeout(selfiesTimer);
+            supabase.removeChannel(channels);
+        };
     }, []);
 
     const handleLogin = (member: Member, password: string) => {
