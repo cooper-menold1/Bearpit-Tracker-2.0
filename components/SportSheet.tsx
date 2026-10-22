@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Game, Member, AttendanceRecord, Role } from '../types';
 import { Calendar, MapPin, Trophy, CheckCircle2, Circle } from 'lucide-react';
 import { formatFriendlyDate, timeSortKey } from '../utils/dateUtils';
+import { isEventCheckin } from '../utils/fanTier';
 
 interface SportSheetProps {
   sportName: string;
@@ -35,12 +36,13 @@ export const SportSheet: React.FC<SportSheetProps> = ({
 
   // Calculate attendance % for a member in THIS sport's games
   const getAttendanceRate = (memberId: string) => {
-    if (games.length === 0) return 0;
+    const countable = games.filter(g => !isEventCheckin(g));
+    if (countable.length === 0) return 0;
     let attended = 0;
-    games.forEach(g => {
+    countable.forEach(g => {
       if (attendance[g.id]?.[memberId]) attended++;
     });
-    return attended / games.length;
+    return attended / countable.length;
   };
 
   const filteredMembers = useMemo(() => {

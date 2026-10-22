@@ -1,22 +1,52 @@
 import { AppState, BonusPoint, Game, Member, Role } from '../types';
 import { POINT_CATEGORIES, FAN_TIERS } from '../constants';
 
-// The one rule for game points, used everywhere: 1 for attending, +1 if
-// it's a bonus game. Games no longer carry a custom point value
-// (Game.pointsValue / games.points_value is ignored).
-export const gamePointValue = (game: Pick<Game, 'isBonus'>) => (game.isBonus ? 2 : 1);
+export const GAME_ATTENDANCE_CATEGORY = 'Game Attendance';
+
+// Event check-ins: a "game" whose id starts with one of these prefixes is
+// really a club event check-in (e.g. tabling). It awards its own pointsValue
+// in its own category instead of 1 point of Game Attendance. Add prefixes here.
+const EVENT_CHECKIN_PREFIXES: Record<string, string> = {
+    tabling_: 'Marketing',
+};
+
+const eventPrefixOf = (game: Pick<Game, 'id'>) =>
+    Object.keys(EVENT_CHECKIN_PREFIXES).find(p => String(game.id).startsWith(p));
+
+export const isEventCheckin = (game: Pick<Game, 'id'>) => eventPrefixOf(game) !== undefined;
+
+// Category a check-in's points are filed under.
+export const checkinCategory = (game: Pick<Game, 'id'>) => {
+    const p = eventPrefixOf(game);
+    return p ? EVENT_CHECKIN_PREFIXES[p] : GAME_ATTENDANCE_CATEGORY;
+};
+
+// The one rule for check-in points, used everywhere: normal games are 1 for
+// attending, +1 if bonus. Event check-ins use their own pointsValue (fallback 1).
+export const gamePointValue = (game: Pick<Game, 'isBonus'> & Partial<Pick<Game, 'id' | 'pointsValue'>>) =>
+    game.id !== undefined && isEventCheckin({ id: game.id })
+        ? (game.pointsValue || 1)
+        : (game.isBonus ? 2 : 1);
+
+// Check-in points for one member, split by category.
+const checkinPointsByCategory = (memberId: string, data: AppState) => {
+    const out: Record<string, number> = {};
+    data.games.forEach(g => {
+        if (data.attendance[g.id]?.[memberId]) {
+            const c = checkinCategory(g);
+            out[c] = (out[c] || 0) + gamePointValue(g);
+        }
+    });
+    return out;
+};
 
 // Lifetime points decide a member's fan level (rank); the leaderboard
 // separately ranks by the current semester's points.
 export const computeLifetimeStats = (member: Member, data: AppState) => {
     // "Game Attendance" is its own category, earned automatically from check-ins.
-    let gameAttendancePoints = 0;
-    data.games.forEach(g => {
-        if (data.attendance[g.id]?.[member.id]) gameAttendancePoints += gamePointValue(g);
-    });
-
+    const checkins = checkinPointsByCategory(member.id, data);
     const myBonusPoints = data.bonusPoints.filter(b => b.memberId === member.id);
-    return buildLifetimeStats(member, gameAttendancePoints, myBonusPoints);
+    return buildLifetimeStats(member, checkins, myBonusPoints);
 };
 
 // Batch version for lists: groups bonus points once instead of filtering per
@@ -30,21 +60,18 @@ export const computeLifetimeTiers = (data: AppState) => {
     });
     const tiers = new Map<string, ReturnType<typeof computeLifetimeStats>['tier']>();
     data.members.forEach(member => {
-        let gameAttendancePoints = 0;
-        data.games.forEach(g => {
-            if (data.attendance[g.id]?.[member.id]) gameAttendancePoints += gamePointValue(g);
-        });
-        tiers.set(member.id, buildLifetimeStats(member, gameAttendancePoints, bonusByMember.get(member.id) || []).tier);
+        tiers.set(member.id, buildLifetimeStats(member, checkinPointsByCategory(member.id, data), bonusByMember.get(member.id) || []).tier);
     });
     return tiers;
 };
 
-const buildLifetimeStats = (member: Member, gameAttendancePoints: number, myBonusPoints: BonusPoint[]) => {
+const buildLifetimeStats = (member: Member, checkins: Record<string, number>, myBonusPoints: BonusPoint[]) => {
     const categories = [
-        { name: 'Game Attendance', points: gameAttendancePoints, icon: 'game' as const },
+        { name: GAME_ATTENDANCE_CATEGORY, points: checkins[GAME_ATTENDANCE_CATEGORY] || 0, icon: 'game' as const },
         ...POINT_CATEGORIES.map(name => ({
             name,
-            points: myBonusPoints.filter(b => (b.category || 'Other') === name).reduce((sum, b) => sum + b.points, 0),
+            points: myBonusPoints.filter(b => (b.category || 'Other') === name).reduce((sum, b) => sum + b.points, 0)
+                + (checkins[name] || 0),
             icon: 'category' as const,
         })),
     ];

@@ -8,7 +8,7 @@ import { Leaderboard } from './Leaderboard';
 import { SelfieContest } from './SelfieContest';
 import { FAN_TIERS } from '../constants';
 import { todayInChicago, parseLocalDate, formatGameTime, timeSortKey } from '../utils/dateUtils';
-import { computeLifetimeStats, gamePointValue } from '../utils/fanTier';
+import { computeLifetimeStats, gamePointValue, isEventCheckin, checkinCategory } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
 
 const Management = lazy(() => import('./Management').then(m => ({ default: m.Management })));
@@ -56,7 +56,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 kind: 'game' as const,
                 date: g.date,
                 label: g.opponent,
-                sub: g.location,
+                sub: isEventCheckin(g) ? checkinCategory(g) : g.location,
                 points: gamePointValue(g),
                 isBonus: g.isBonus,
             }));

@@ -3,7 +3,7 @@ import { AppState, BonusPoint, Role } from '../types';
 import { Trophy, Medal, Filter, TrendingUp, Users, CalendarRange } from 'lucide-react';
 import { POINT_CATEGORIES } from '../constants';
 import { semesterOf, currentSemester, listSemesters } from '../utils/semester';
-import { computeLifetimeTiers, gamePointValue } from '../utils/fanTier';
+import { computeLifetimeTiers, gamePointValue, isEventCheckin, checkinCategory } from '../utils/fanTier';
 
 const GAME_ATTENDANCE = 'Game Attendance';
 const ALL_CATEGORIES = 'all';
@@ -49,10 +49,20 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
         const rows = data.members.map(member => {
             let gamePoints = 0;
             let gamesAttended = 0;
+            let eventPoints = 0;
+            const eventByCategory: Record<string, number> = {};
 
             // 1. Calculate Game Points & Attendance
             games.forEach(game => {
                 if (data.attendance[game.id]?.[member.id]) {
+                    if (isEventCheckin(game)) {
+                        // Event check-ins (tabling etc.) score in their own category, not as a game.
+                        const pts = gamePointValue(game);
+                        eventPoints += pts;
+                        const c = checkinCategory(game);
+                        eventByCategory[c] = (eventByCategory[c] || 0) + pts;
+                        return;
+                    }
                     gamePoints += gamePointValue(game);
                     gamesAttended++;
                 }
@@ -60,7 +70,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
 
             // 2. Calculate Bonus Points (Manual)
             let bonusPoints = 0;
-            const byCategory: Record<string, number> = { [GAME_ATTENDANCE]: gamePoints };
+            const byCategory: Record<string, number> = { ...eventByCategory, [GAME_ATTENDANCE]: gamePoints };
             bonusByMember.get(member.id)?.forEach(bp => {
                 bonusPoints += bp.points;
                 const cat = bp.category || 'Other';
@@ -68,6 +78,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
             });
             // Bonus points aren't tied to a sport, so a sport filter drops them.
             if (filterSportId !== 'all') bonusPoints = 0;
+            // Event check-ins are tied to a sport's game row, so they stay; shown with bonus points.
+            bonusPoints += eventPoints;
 
             return {
                 ...member,
