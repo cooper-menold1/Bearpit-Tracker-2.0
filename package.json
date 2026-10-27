@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
     "lucide-react": "^0.554.0",
+    "qrcode": "1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^3.4.1"
@@ -18,6 +19,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^22.14.0",
+    "@types/qrcode": "1.5.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^5.0.0",

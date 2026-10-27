@@ -16,10 +16,23 @@ export const ATTENDANCE_POINTS = {
 
 // Event check-ins: a "game" whose id starts with one of these prefixes is
 // really a club event check-in (e.g. tabling). It awards its own pointsValue
-// in its own category instead of 1 point of Game Attendance. Add prefixes here.
-const EVENT_CHECKIN_PREFIXES: Record<string, string> = {
+// in its own category instead of 1 point of Game Attendance. Add prefixes here,
+// and to is_event_checkin_id() in supabase/migrations/20261026_event_checkin_codes.sql.
+export const EVENT_CHECKIN_PREFIXES: Record<string, string> = {
     tabling_: 'Marketing',
+    marketing_: 'Marketing',
+    hosp_: 'Hospitality',
+    gameday_: 'Game Day',
+    media_: 'Media',
+    service_: 'Community',
+    community_: 'Community',
+    recruit_: 'Recruitment',
+    lead_: 'Leadership / Special Projects',
 };
+
+// Prefix new check-ins in a category get (the first match above).
+export const eventCheckinPrefixFor = (category: string) =>
+    Object.keys(EVENT_CHECKIN_PREFIXES).find(p => EVENT_CHECKIN_PREFIXES[p] === category);
 
 const eventPrefixOf = (game: Pick<Game, 'id'>) =>
     Object.keys(EVENT_CHECKIN_PREFIXES).find(p => String(game.id).startsWith(p));

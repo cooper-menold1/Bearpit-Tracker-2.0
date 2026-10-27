@@ -251,6 +251,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                 onAddClubEvent={onAddClubEvent}
                                 onDeleteClubEvent={onDeleteClubEvent}
                                 userRole={member.role}
+                                allMembers={data.members}
                             />
                             </Suspense>
                             <div className="mt-2 text-center text-xs text-gray-400">
@@ -383,7 +384,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                     <ClipboardList className="w-4 h-4" /> Sign Up for a Club Event
                                 </h3>
-                                <p className="text-xs text-gray-500 mt-1">Tabling shifts and other club events. Signing up claims a slot and awards the points automatically.</p>
+                                <p className="text-xs text-gray-500 mt-1">Tabling shifts and other club events. Signing up holds your slot. You get the points once an officer marks you attended.</p>
                             </div>
                             <div className="divide-y divide-gray-100">
                                 {[...data.clubEvents].sort((a, b) => {
@@ -409,8 +410,10 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                                 </div>
                                                 {ev.description && <p className="text-xs text-gray-400 mt-1">{ev.description}</p>}
                                             </div>
-                                            {mySignup && isPast ? (
+                                            {mySignup && mySignup.bonusPointId && (isPast || ev.date === todayInChicago()) ? (
                                                 <span className="flex items-center gap-1 text-sm font-bold text-green-700 px-3 py-1.5 shrink-0"><CheckCircle2 className="w-4 h-4" /> Attended</span>
+                                            ) : mySignup && isPast ? (
+                                                <span className="text-sm font-bold text-gray-400 px-3 py-1.5 shrink-0 text-right">Not marked<br className="sm:hidden" /> attended</span>
                                             ) : isPast ? (
                                                 <span className="text-sm font-bold text-gray-400 px-3 py-1.5 shrink-0">Ended</span>
                                             ) : mySignup ? (

@@ -1,12 +1,14 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Member, Game, Sport } from '../types';
 import { PrivacyLink } from './PrivacyPolicy';
-import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
+import { CheckCircle2, User, Calendar, Trophy, AlertTriangle, ArrowLeft, MapPin, Loader2, KeyRound } from 'lucide-react';
 import { VENUES } from '../constants';
 import { todayInChicago, formatGameTime, timeSortKey } from '../utils/dateUtils';
 import { SelfieUpload } from './SelfieUpload';
 import { getDistance, getCurrentPosition, geofenceStatus, isInAppBrowser, APPROX_ACCURACY_METERS } from '../utils/location';
+import { isEventCheckin, checkinCategory } from '../utils/fanTier';
+import { eventCodesAvailable, submitEventCheckin } from '../utils/eventCheckin';
 
 export interface AttendanceLocation {
     latitude: number;
@@ -22,16 +24,28 @@ interface AttendanceFormProps {
     sports: Sport[];
     onSubmit: (gameId: string, memberId: string, location: AttendanceLocation | null, newMemberDetails?: Member) => Promise<string | null>;
     onBack: () => void;
+    // From an officer's rotating QR (?checkin=<gameId>&code=<code>). A logged-in
+    // member skips the name step.
+    initialGameId?: string;
+    initialCode?: string;
+    initialMember?: Member | null;
 }
 
-export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, sports, onSubmit, onBack }) => {
-    const [step, setStep] = useState(1);
-    const [name, setName] = useState('');
-    const [matchedMember, setMatchedMember] = useState<Member | null>(null);
+export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, sports, onSubmit, onBack, initialGameId, initialCode, initialMember }) => {
+    const [step, setStep] = useState(initialMember ? 2 : 1);
+    const [name, setName] = useState(initialMember ? `${initialMember.firstName} ${initialMember.lastName}` : '');
+    const [matchedMember, setMatchedMember] = useState<Member | null>(initialMember || null);
     const [notFound, setNotFound] = useState(false);
     const [selectedGameId, setSelectedGameId] = useState('');
 
+    // Event check-ins (tabling_, hosp_, ...) use the officer's rotating code
+    // instead of location once the 20261026 migration is in. Until then
+    // (codesOn false) they keep the old location flow.
+    const [code, setCode] = useState(initialCode || '');
+    const [codesOn, setCodesOn] = useState<boolean | null>(null);
+
     const selectedGame = games.find(g => g.id === selectedGameId);
+    const useCode = !!selectedGame && isEventCheckin(selectedGame) && codesOn === true;
     const isAwayGame = selectedGame?.location === 'Away';
     const selectedSport = selectedGame ? sports.find(s => s.id === selectedGame.sportId) : null;
     const hasVenues = (selectedSport?.venueIds?.length || 0) > 0 && !isAwayGame;
@@ -112,8 +126,22 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
         }
     };
 
-    const handleGameChange = (gameId: string) => {
+    const handleGameChange = async (gameId: string) => {
         setSelectedGameId(gameId);
+        setSubmitError(null);
+        const game = games.find(g => g.id === gameId);
+        if (game && isEventCheckin(game)) {
+            const on = await eventCodesAvailable();
+            setCodesOn(on);
+            if (on) {
+                // The code replaces location: cancel any location request in flight.
+                requestIdRef.current++;
+                setIsVerifyingLocation(false);
+                setLocation(null);
+                setLocationError(null);
+                return;
+            }
+        }
         if (gameId) {
             shareLocation(gameId);
         } else {
@@ -121,6 +149,13 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
             setLocationError(null);
         }
     };
+
+    // QR link: preselect its event when it's on today's list.
+    const qrGameIsToday = !!initialGameId && todaysGames.some(g => g.id === initialGameId);
+    useEffect(() => {
+        if (qrGameIsToday) handleGameChange(initialGameId!);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleNameNext = (e: React.FormEvent) => {
         e.preventDefault();
@@ -149,7 +184,9 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
         setIsSubmitting(true);
         setSubmitError(null);
         try {
-            const err = await onSubmit(selectedGameId, matchedMember.id, location);
+            const err = useCode
+                ? await submitEventCheckin(selectedGameId, matchedMember.id, code)
+                : await onSubmit(selectedGameId, matchedMember.id, location);
             if (err) {
                 setSubmitError(err);
             } else {
@@ -193,7 +230,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                 onClick={onBack}
                 className="absolute top-4 left-4 flex items-center gap-1 text-white/80 hover:text-white text-sm font-medium transition-colors z-10"
             >
-                <ArrowLeft className="w-4 h-4" /> Back to Login
+                <ArrowLeft className="w-4 h-4" /> {initialMember ? 'Back' : 'Back to Login'}
             </button>
 
             <div className="w-full max-w-lg bg-white rounded-xl shadow-lg overflow-hidden border-2 border-[#FFB81C]">
@@ -207,6 +244,12 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                         <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? 'bg-[#154734]' : 'bg-gray-200'}`}></div>
                         <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? 'bg-[#154734]' : 'bg-gray-200'}`}></div>
                     </div>
+
+                    {initialGameId && !qrGameIsToday && (
+                        <div className="bg-amber-50 p-3 rounded-lg text-sm text-amber-800 border border-amber-100">
+                            That check-in link isn't for an event happening today. Pick today's event below.
+                        </div>
+                    )}
 
                     {step === 1 && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -246,7 +289,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
                     {step === 2 && (
                         <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-                            {inApp && (
+                            {inApp && !useCode && (
                                 <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg flex items-start gap-2">
                                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                                     <span>You're in an in-app browser. Open this page in Safari/Chrome for location to work (tap ••• &gt; Open in browser).</span>
@@ -278,7 +321,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                             <option value="">-- Select an Event --</option>
                                             {todaysGames.map(g => (
                                                 <option key={g.id} value={g.id}>
-                                                    {g.opponent} ({g.location}) - {formatGameTime(g.time)}
+                                                    {g.opponent} ({isEventCheckin(g) ? checkinCategory(g) : g.location}) - {formatGameTime(g.time)}
                                                 </option>
                                             ))}
                                         </select>
@@ -290,6 +333,25 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                 </div>
                             </div>
 
+                            {useCode ? (
+                                <div className="animate-in fade-in duration-300">
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Check-in Code</label>
+                                    <div className="relative">
+                                        <KeyRound className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                                        <input aria-label="Check-in code"
+                                            type="text"
+                                            inputMode="numeric"
+                                            autoComplete="one-time-code"
+                                            maxLength={6}
+                                            value={code}
+                                            onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setSubmitError(null); }}
+                                            className="pl-10 w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 text-xl font-mono tracking-[0.4em] focus:ring-[#FFB81C] focus:border-[#FFB81C]"
+                                            placeholder="000000"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">Enter the 6-digit code on the officer's screen (or scan their QR). It changes every minute. No location needed.</p>
+                                </div>
+                            ) : (<>
                             <p className="text-xs text-gray-500 mb-2">
                                 Your location is shared when you check in so officers can confirm you were at the venue. See our <PrivacyLink className="text-[#154734]" />.
                             </p>
@@ -350,6 +412,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
                                     ) : null}
                                 </div>
                             )}
+                            </>)}
 
                             {submitError && (
                                 <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 p-3 rounded-lg border border-red-200">
@@ -360,7 +423,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
                             <button
                                 onClick={handleSubmit}
-                                disabled={!selectedGameId || isVerifyingLocation || isSubmitting}
+                                disabled={!selectedGameId || isSubmitting || (useCode ? code.length !== 6 : isVerifyingLocation)}
                                 className="w-full bg-[#154734] text-white py-3 rounded-lg font-bold hover:bg-[#0f3325] disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-colors mt-4 flex items-center justify-center gap-2"
                             >
                                 {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
