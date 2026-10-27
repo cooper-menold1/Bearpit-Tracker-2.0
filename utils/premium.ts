@@ -1,4 +1,4 @@
-// Premium games (Game.isBonus = true, worth 2 via gamePointValue in utils/fanTier.ts).
+// Premium games (Game.isBonus = true, worth 4 via gamePointValue in utils/fanTier.ts).
 // Source: Fall 2026 BearPit Point Incentive Framework. Update each semester.
 // KEEP IN SYNC with the copy in supabase/functions/autofill-schedule/index.ts
 // (the edge function is a single pasted file and cannot import from the app).

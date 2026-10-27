@@ -582,7 +582,7 @@ export const Management: React.FC<ManagementProps> = ({
                                         </div>
 
                                         <p className="text-xs text-gray-500">
-                                            Worth {gamePointValue({ isBonus: gameForm.isBonus })} point{gameForm.isBonus ? 's' : ''}. Every game is 1 point, bonus games are 2.
+                                            Worth {gamePointValue({ isBonus: gameForm.isBonus, location: gameForm.location as Game['location'], sportId: gameForm.sportId }, sports)} points. Home games are 2, premium (bonus) games 4, away and neutral games 3, meetings 1. A member's first game in a sport adds 1.
                                         </p>
 
                                         <textarea aria-label="Notes or description" placeholder="Notes / Description" value={gameForm.description} onChange={e => setGameForm({ ...gameForm, description: e.target.value })} className="w-full border p-2 rounded text-sm h-20 focus:ring-2 focus:ring-[#154734] outline-none"></textarea>

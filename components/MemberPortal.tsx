@@ -8,7 +8,7 @@ import { Leaderboard } from './Leaderboard';
 import { SelfieContest } from './SelfieContest';
 import { FAN_TIERS } from '../constants';
 import { todayInChicago, parseLocalDate, formatGameTime, timeSortKey } from '../utils/dateUtils';
-import { computeLifetimeStats, gamePointValue, isEventCheckin, checkinCategory } from '../utils/fanTier';
+import { computeLifetimeStats, gamePointValue, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
 
 const Management = lazy(() => import('./Management').then(m => ({ default: m.Management })));
@@ -50,14 +50,15 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
 
         // Recent activity feed: combine game check-ins + manual bonus point
         // entries into one "where are my points coming from" timeline.
+        const firstIds = firstSportGameIds(member.id, data);
         const gameHistory = data.games
             .filter(g => data.attendance[g.id]?.[member.id])
             .map(g => ({
                 kind: 'game' as const,
                 date: g.date,
                 label: g.opponent,
-                sub: isEventCheckin(g) ? checkinCategory(g) : g.location,
-                points: gamePointValue(g),
+                sub: isEventCheckin(g) ? checkinCategory(g) : (firstIds.has(g.id) ? `${g.location} · first in this sport, +1` : g.location),
+                points: checkinPointsFor(g, firstIds, data.sports),
                 isBonus: g.isBonus,
             }));
         const bonusHistory = myBonusPoints.map(b => ({
@@ -90,7 +91,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                 time: g.time,
                 title: `${data.sports.find(s => s.id === g.sportId)?.name || 'Game'} vs ${g.opponent}`,
                 sub: g.location,
-                points: gamePointValue(g),
+                points: gamePointValue(g, data.sports),
                 isBonus: g.isBonus,
             }));
         const events = data.clubEvents

@@ -14,10 +14,10 @@ export const VENUES: Venue[] = [
   { id: 'foster_campus', name: 'Foster Campus for Business and Innovation', latitude: 31.5451683, longitude: -97.1154583, radiusMeters: 1000 } // coords corrected 2026-10-13 against OSM (old value was ~230 m off); radius kept at 1 km by owner so meetings work anywhere around Foster
 ];
 
-// Officer-assigned point categories, from the points menu presented at the
-// 2026-09-14 leadership meeting. Game Attendance is tracked separately and
-// automatically from check-ins, so it isn't listed here. 'Other' stays last
-// for legacy rows and one-off adjustments.
+// Officer-assigned point categories, from the Official BPLT Incentive
+// Framework (Fall 2026), which has eight categories. Attendance is the eighth:
+// it's earned automatically from check-ins (utils/fanTier.ts), so it isn't
+// listed here. 'Other' stays last for legacy rows and one-off adjustments.
 export const POINT_CATEGORIES = [
   'Hospitality',
   'Game Day',
@@ -25,21 +25,22 @@ export const POINT_CATEGORIES = [
   'Marketing',
   'Media',
   'Community',
-  'Leadership',
+  'Leadership / Special Projects',
   'Other',
 ];
 
-// Fan levels, lowest first. Tier names are from the 2026-09-14 meeting
-// (Rookie, Starter, Captain, BPLT All-Star). Point + category thresholds
-// follow the Fall 2026 Point Incentive Framework benchmarks (20/2, 40/3,
-// 60/4). A member needs BOTH the points and the number of different
-// categories to reach a tier ("no point farming" breadth rule).
-// Game Attendance counts as a category; 'Other' does not.
+// Fan levels, lowest first, from the Official BPLT Incentive Framework
+// (Fall 2026): Rookie 20+ pts in 2 categories, Starter 40+/3, Captain 60+/4,
+// BPLT All-Star 80+/5. A member needs BOTH the points and the number of
+// different categories to reach a tier (breadth rule). The first entry is
+// the starting level before Rookie. Attendance counts as a category;
+// 'Other' does not.
 export const FAN_TIERS = [
-  { name: 'Rookie', minPoints: 0, minCategories: 0 },
-  { name: 'Starter', minPoints: 20, minCategories: 2 },
-  { name: 'Captain', minPoints: 40, minCategories: 3 },
-  { name: 'BPLT All-Star', minPoints: 60, minCategories: 4 },
+  { name: 'Unranked', minPoints: 0, minCategories: 0 },
+  { name: 'Rookie', minPoints: 20, minCategories: 2 },
+  { name: 'Starter', minPoints: 40, minCategories: 3 },
+  { name: 'Captain', minPoints: 60, minCategories: 4 },
+  { name: 'BPLT All-Star', minPoints: 80, minCategories: 5 },
 ];
 
 // Shown on the landing page's "Interested in Joining?" card. '' hides the badge.
