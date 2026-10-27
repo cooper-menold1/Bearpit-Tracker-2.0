@@ -1,6 +1,6 @@
 import { AppState, BonusPoint, Game, Member, Role, Sport } from '../types';
-import { POINT_CATEGORIES, FAN_TIERS } from '../constants';
-import { isMeetingSport } from './applicationArchive';
+import { POINT_CATEGORIES, FAN_TIERS, HIDDEN_MEMBER_IDS } from '../constants';
+import { isMeetingSport, getApplicationDate } from './applicationArchive';
 
 export const GAME_ATTENDANCE_CATEGORY = 'Attendance';
 
@@ -13,6 +13,18 @@ export const ATTENDANCE_POINTS = {
     newSport: 1,    // extra, first game ever attended in a sport
     meeting: 1,     // meetings (2 if marked bonus)
 };
+
+// Referral points (Recruitment), from the same framework. Derived from
+// members.referred_by_id, never written as bonus_points rows.
+export const REFERRAL_POINTS = {
+    applied: 1,       // "In the stands recruiting (name as a reference)": someone names you when they apply
+    firstMeeting: 2,  // "Bring a first-time guest to a meeting": that person checks in to their first meeting
+};
+export const REFERRAL_CATEGORY = 'Recruitment';
+
+// Who can be picked as a referrer: current members, not prospects/inactive or preview accounts.
+export const canBeReferrer = (m: Member) =>
+    m.role !== Role.PROSPECTIVE && m.role !== Role.INACTIVE && !HIDDEN_MEMBER_IDS.includes(m.id);
 
 // Event check-ins: a "game" whose id starts with one of these prefixes is
 // really a club event check-in (e.g. tabling). It awards its own pointsValue
@@ -80,13 +92,66 @@ const checkinPointsByCategory = (memberId: string, data: AppState) => {
     return out;
 };
 
+export interface ReferralAward {
+    referredId: string;
+    referredName: string;
+    kind: 'applied' | 'firstMeeting';
+    points: number;
+    date: string; // YYYY-MM-DD, '' if the apply date can't be read from the id
+    label: string; // activity feed text, e.g. "Referral: Jane Doe applied"
+}
+
+const ymd = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Every referral award, grouped by the referring member's id. +1 when the
+// referred person applies (dated by their prospect_<ms> id) and +2 when they
+// check in to their first meeting (dated by that meeting). Self-referrals earn nothing.
+export const referralAwardsByMember = (data: Pick<AppState, 'members' | 'games' | 'attendance' | 'sports'>) => {
+    const out = new Map<string, ReferralAward[]>();
+    const referred = data.members.filter(m => m.referredById && m.referredById !== m.id);
+    if (referred.length === 0) return out;
+
+    // Meetings oldest first, so the first one a person attended is their first meeting.
+    const meetings = data.games
+        .filter(g => isMeetingGame(g, data.sports))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+    referred.forEach(m => {
+        const name = `${m.firstName} ${m.lastName}`.trim();
+        const applied = getApplicationDate(m);
+        const awards: ReferralAward[] = [{
+            referredId: m.id, referredName: name, kind: 'applied', points: REFERRAL_POINTS.applied,
+            date: applied ? ymd(applied) : '', label: `Referral: ${name} applied`,
+        }];
+        const first = meetings.find(g => data.attendance[g.id]?.[m.id]);
+        if (first) awards.push({
+            referredId: m.id, referredName: name, kind: 'firstMeeting', points: REFERRAL_POINTS.firstMeeting,
+            date: first.date.slice(0, 10), label: `Referral: ${name} came to their first meeting`,
+        });
+        const list = out.get(m.referredById!);
+        if (list) list.push(...awards);
+        else out.set(m.referredById!, awards);
+    });
+    return out;
+};
+
+// Check-in points plus referral points, by category (all the derived points).
+const derivedPointsByCategory = (memberId: string, data: AppState, referrals: ReferralAward[]) => {
+    const out = checkinPointsByCategory(memberId, data);
+    referrals.forEach(r => { out[REFERRAL_CATEGORY] = (out[REFERRAL_CATEGORY] || 0) + r.points; });
+    return out;
+};
+
 // Lifetime points decide a member's fan level (rank); the leaderboard
 // separately ranks by the current semester's points.
 export const computeLifetimeStats = (member: Member, data: AppState) => {
     // "Game Attendance" is its own category, earned automatically from check-ins.
-    const checkins = checkinPointsByCategory(member.id, data);
+    // Referral points land in Recruitment, also automatically.
+    const myReferrals = referralAwardsByMember(data).get(member.id) || [];
+    const derived = derivedPointsByCategory(member.id, data, myReferrals);
     const myBonusPoints = data.bonusPoints.filter(b => b.memberId === member.id);
-    return buildLifetimeStats(member, checkins, myBonusPoints);
+    return { ...buildLifetimeStats(member, derived, myBonusPoints), myReferrals };
 };
 
 // Batch version for lists: groups bonus points once instead of filtering per
@@ -98,9 +163,11 @@ export const computeLifetimeTiers = (data: AppState) => {
         if (list) list.push(b);
         else bonusByMember.set(b.memberId, [b]);
     });
+    const referrals = referralAwardsByMember(data);
     const tiers = new Map<string, ReturnType<typeof computeLifetimeStats>['tier']>();
     data.members.forEach(member => {
-        tiers.set(member.id, buildLifetimeStats(member, checkinPointsByCategory(member.id, data), bonusByMember.get(member.id) || []).tier);
+        const derived = derivedPointsByCategory(member.id, data, referrals.get(member.id) || []);
+        tiers.set(member.id, buildLifetimeStats(member, derived, bonusByMember.get(member.id) || []).tier);
     });
     return tiers;
 };

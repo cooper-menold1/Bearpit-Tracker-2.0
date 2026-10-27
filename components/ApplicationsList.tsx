@@ -1,15 +1,40 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppState, Role, EmailTemplate } from '../types';
-import { Users, Mail, Settings2, Save, Eye, EyeOff, Copy, Check, FileSpreadsheet } from 'lucide-react';
+import { AppState, Role, EmailTemplate, Member } from '../types';
+import { Users, Mail, Settings2, Save, Eye, EyeOff, Copy, Check, FileSpreadsheet, Link2 } from 'lucide-react';
 import { splitApplications, ARCHIVE_AFTER_DAYS } from '../utils/applicationArchive';
 import { renderEmailTemplate, buildMailto, buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
+import { canBeReferrer } from '../utils/fanTier';
 
 interface ApplicationsListProps {
     data: AppState;
     onApprove: (memberId: string) => void;
     onReject: (memberId: string) => void;
     onSaveTemplate: (template: EmailTemplate) => void;
+    // Links an old free-text referral to a member (writes members.referred_by_id).
+    // Returns an error message, or null on success.
+    onLinkReferrer?: (memberId: string, referrerId: string) => Promise<string | null>;
 }
+
+// Best guess at which member a free-text "referred by" means, e.g. "hailey jacob"
+// or "I talked to Matt and Anna". Full name > last name > first name > nickname
+// prefix ("matt" for Matthew). Returns undefined if nothing matches.
+const suggestReferrer = (text: string, candidates: Member[]): Member | undefined => {
+    const lower = text.toLowerCase();
+    const words = lower.split(/[^a-z']+/).filter(w => w.length >= 2);
+    let best: Member | undefined;
+    let bestScore = 0;
+    candidates.forEach(m => {
+        const first = m.firstName.toLowerCase().trim();
+        const last = m.lastName.toLowerCase().trim();
+        let score = 0;
+        if (first && last && lower.includes(`${first} ${last}`)) score += 10;
+        if (last && words.includes(last)) score += 3;
+        if (first && words.includes(first)) score += 2;
+        else if (first && words.some(w => w.length >= 3 && first.startsWith(w))) score += 1;
+        if (score > bestScore) { best = m; bestScore = score; }
+    });
+    return best;
+};
 
 const EMPTY_TEMPLATE: EmailTemplate = {
     id: 'prospective_welcome',
@@ -21,7 +46,7 @@ const EMPTY_TEMPLATE: EmailTemplate = {
     meetingLocation: '',
 };
 
-export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onApprove, onReject, onSaveTemplate }) => {
+export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onApprove, onReject, onSaveTemplate, onLinkReferrer }) => {
     const allProspective = useMemo(() => data.members.filter(m => m.role === Role.PROSPECTIVE), [data.members]);
     const { active, archived, statusById } = useMemo(() => splitApplications(allProspective, data), [allProspective, data]);
     const [tab, setTab] = useState<'new' | 'archive'>('new');
@@ -37,6 +62,23 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
     const [saved, setSaved] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [emailsCopied, setEmailsCopied] = useState(false);
+
+    // "Match referrer": officer picks which member an old free-text referral meant.
+    const referrerOptions = useMemo(
+        () => data.members.filter(canBeReferrer).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)),
+        [data.members]
+    );
+    const [linkChoice, setLinkChoice] = useState<Record<string, string>>({});
+    const [linking, setLinking] = useState<string | null>(null);
+    const [linkError, setLinkError] = useState('');
+    const linkReferrer = async (memberId: string, referrerId: string) => {
+        if (!onLinkReferrer || !referrerId) return;
+        setLinking(memberId);
+        setLinkError('');
+        const err = await onLinkReferrer(memberId, referrerId);
+        setLinking(null);
+        if (err) setLinkError(`${err} (Has the 20261026_referral_points.sql migration been run?)`);
+    };
 
     const toggleSelected = (id: string) => {
         setSelectedIds(prev => {
@@ -82,6 +124,45 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
         onSaveTemplate(form);
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
+    };
+
+    // Linked referrals show the member's name; unlinked free text gets a
+    // pre-suggested dropdown so an officer can link it (that's what earns points).
+    const renderReferredBy = (m: Member) => {
+        if (m.referredById) {
+            const r = data.members.find(x => x.id === m.referredById);
+            return (
+                <span className="inline-flex items-center gap-1 text-[#154734] font-medium" title="Linked: earns this member referral points">
+                    <Link2 className="w-3 h-3" /> {r ? `${r.firstName} ${r.lastName}` : m.referredBy || 'Unknown member'}
+                </span>
+            );
+        }
+        if (!m.referredBy?.trim()) return '—';
+        if (!onLinkReferrer) return m.referredBy;
+        const choice = linkChoice[m.id] ?? suggestReferrer(m.referredBy, referrerOptions)?.id ?? '';
+        return (
+            <div className="space-y-1 min-w-[12rem]">
+                <p className="italic">"{m.referredBy}"</p>
+                <div className="flex items-center gap-1">
+                    <select aria-label={`Match referrer for ${m.firstName} ${m.lastName}`}
+                        value={choice}
+                        onChange={e => setLinkChoice(prev => ({ ...prev, [m.id]: e.target.value }))}
+                        className="border border-gray-300 rounded-md p-1 text-xs bg-white outline-none max-w-[10rem]"
+                    >
+                        <option value="">Match referrer...</option>
+                        {referrerOptions.filter(r => r.id !== m.id).map(r => <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>)}
+                    </select>
+                    <button
+                        onClick={() => linkReferrer(m.id, choice)}
+                        disabled={!choice || linking === m.id}
+                        title="Link this referral to the member, so they get Recruitment points"
+                        className="text-xs font-bold text-[#154734] hover:text-[#FFB81C] disabled:opacity-40"
+                    >
+                        {linking === m.id ? '...' : 'Link'}
+                    </button>
+                </div>
+            </div>
+        );
     };
 
     const previewMember = { id: 'preview', firstName: 'Riley', lastName: 'Sample', role: Role.PROSPECTIVE, yearsInBPLT: 0, email: 'riley.sample1@baylor.edu' };
@@ -268,6 +349,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                             {label}
                         </button>
                     ))}
+                    {linkError && <span className="text-xs text-red-600 ml-2">{linkError}</span>}
                     {tab === 'archive' && (
                         <span className="text-xs text-gray-500 ml-2">No meeting check-in in {Math.round(ARCHIVE_AFTER_DAYS / 7)}+ weeks ({ARCHIVE_AFTER_DAYS} days).</span>
                     )}
@@ -303,7 +385,7 @@ export const ApplicationsList: React.FC<ApplicationsListProps> = ({ data, onAppr
                                     <td className="px-6 py-4 text-gray-500">{m.phone || '—'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.year || '—'}</td>
                                     <td className="px-6 py-4 text-gray-500">{m.heardAbout || '—'}</td>
-                                    <td className="px-6 py-4 text-gray-500">{m.referredBy || '—'}</td>
+                                    <td className="px-6 py-4 text-gray-500">{renderReferredBy(m)}</td>
                                     <td className="px-6 py-4 text-gray-500 whitespace-nowrap">{formatShortDate(statusById.get(m.id)?.appliedDate) || 'Unknown'}</td>
                                     <td className="px-6 py-4 text-gray-500 whitespace-nowrap">{formatShortDate(statusById.get(m.id)?.lastMeetingDate) || '—'}</td>
                                     <td className="px-6 py-4 text-right whitespace-nowrap">

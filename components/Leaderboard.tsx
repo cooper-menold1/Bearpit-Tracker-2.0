@@ -3,7 +3,7 @@ import { AppState, BonusPoint, Role } from '../types';
 import { Trophy, Medal, Filter, TrendingUp, Users, CalendarRange } from 'lucide-react';
 import { POINT_CATEGORIES } from '../constants';
 import { semesterOf, currentSemester, listSemesters } from '../utils/semester';
-import { computeLifetimeTiers, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory, GAME_ATTENDANCE_CATEGORY } from '../utils/fanTier';
+import { computeLifetimeTiers, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory, GAME_ATTENDANCE_CATEGORY, referralAwardsByMember, REFERRAL_CATEGORY } from '../utils/fanTier';
 
 const GAME_ATTENDANCE = GAME_ATTENDANCE_CATEGORY;
 const ALL_CATEGORIES = 'all';
@@ -46,6 +46,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
             else bonusByMember.set(bp.memberId, [bp]);
         });
 
+        const referrals = referralAwardsByMember(data);
+
         const rows = data.members.map(member => {
             let gamePoints = 0;
             let gamesAttended = 0;
@@ -77,6 +79,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                 bonusPoints += bp.points;
                 const cat = bp.category || 'Other';
                 byCategory[cat] = (byCategory[cat] || 0) + bp.points;
+            });
+            // Referral points (derived, Recruitment) count like bonus points in the semester they were earned.
+            referrals.get(member.id)?.forEach(r => {
+                if (!r.date || semesterOf(r.date).key !== semesterKey) return;
+                bonusPoints += r.points;
+                byCategory[REFERRAL_CATEGORY] = (byCategory[REFERRAL_CATEGORY] || 0) + r.points;
             });
             // Bonus points aren't tied to a sport, so a sport filter drops them.
             if (filterSportId !== 'all') bonusPoints = 0;
