@@ -29,6 +29,55 @@ export const POINT_CATEGORIES = [
   'Other',
 ];
 
+// Officer-awarded point menu from the Official BPLT Incentive Framework
+// (Fall 2026). Used as presets by the Points Manager forms and the Quick
+// Award scanner: picking one fills in category/points/reason (reason = the
+// label, so cap counting can find past awards by label + category).
+// Ranged items (e.g. 2-4) let the officer pick a value between minPoints
+// and maxPoints; `points` is the default.
+// Caps: the framework says "Repeated activities may have semester or monthly
+// caps to prevent point farming" but doesn't set numbers yet. The two caps
+// below are placeholders; leadership should fill in / adjust the real ones.
+// Officers can always override a cap warning with "Award anyway".
+export interface PointMenuItem {
+  key: string;
+  label: string;
+  category: string; // one of POINT_CATEGORIES
+  points: number;
+  minPoints?: number;
+  maxPoints?: number;
+  cap?: { per: 'month' | 'semester'; max: number };
+}
+
+export const POINT_MENU: PointMenuItem[] = [
+  // Hospitality
+  { key: 'hosp_team', label: 'Serve on Hospitality Team at a game', category: 'Hospitality', points: 2 },
+  { key: 'hosp_assist', label: 'Assist with a designated hospitality responsibility', category: 'Hospitality', points: 1, cap: { per: 'month', max: 4 } },
+  // Recruitment
+  { key: 'recruit_event', label: 'Attend a recruitment event / interest session', category: 'Recruitment', points: 2 },
+  { key: 'recruit_table', label: 'Flyer/Table to build membership', category: 'Recruitment', points: 2 },
+  // Community
+  { key: 'community_service', label: 'Attend a service event', category: 'Community', points: 2 },
+  { key: 'community_event', label: 'Attend a BearPit community-building event', category: 'Community', points: 2, minPoints: 2, maxPoints: 4 },
+  // Game Day
+  { key: 'gameday_chants', label: 'Lead/support chants or organized student-section activity', category: 'Game Day', points: 2 },
+  { key: 'gameday_setup', label: 'Assist with game-day setup/tear-down', category: 'Game Day', points: 2 },
+  { key: 'gameday_role', label: 'Serve in a special game-day role', category: 'Game Day', points: 2, minPoints: 2, maxPoints: 3 },
+  // Media
+  { key: 'media_photo', label: 'Take approved photography at an event', category: 'Media', points: 2 },
+  { key: 'media_interviews', label: 'Conduct student interviews for social media', category: 'Media', points: 2 },
+  { key: 'media_shoot', label: 'Participate in an approved photo/video shoot', category: 'Media', points: 2 },
+  { key: 'media_content', label: 'Submit approved unofficial content', category: 'Media', points: 1, cap: { per: 'month', max: 4 } },
+  // Marketing
+  { key: 'mkt_table', label: 'Table for a premium game', category: 'Marketing', points: 3 },
+  { key: 'mkt_flyers', label: 'Hand out flyers for a premium game', category: 'Marketing', points: 2 },
+  { key: 'mkt_campaign', label: 'Assist with a promotional campaign with Athletics', category: 'Marketing', points: 2 },
+  // Leadership / Special Projects
+  { key: 'lead_tradition', label: 'Start or establish a new BearPit tradition', category: 'Leadership / Special Projects', points: 5 },
+  { key: 'lead_project', label: 'Complete an approved special project', category: 'Leadership / Special Projects', points: 4 },
+  { key: 'lead_participate', label: 'Participate in approved special project', category: 'Leadership / Special Projects', points: 3 },
+];
+
 // Fan levels, lowest first, from the Official BPLT Incentive Framework
 // (Fall 2026): Rookie 20+ pts in 2 categories, Starter 40+/3, Captain 60+/4,
 // BPLT All-Star 80+/5. A member needs BOTH the points and the number of

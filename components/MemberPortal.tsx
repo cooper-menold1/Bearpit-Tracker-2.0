@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, lazy, Suspense } from 'react';
 import { Member, AppState, Game, Role, ClubEvent } from '../types';
-import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus, Heart, RefreshCw } from 'lucide-react';
+import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus, Heart, RefreshCw, QrCode, Zap } from 'lucide-react';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { Leaderboard } from './Leaderboard';
@@ -12,6 +12,9 @@ import { computeLifetimeStats, gamePointValue, checkinPointsFor, firstSportGameI
 import { semesterOf, currentSemester } from '../utils/semester';
 
 const Management = lazy(() => import('./Management').then(m => ({ default: m.Management })));
+// QR pieces load on first open so the portal bundle doesn't carry them.
+const MemberQR = lazy(() => import('./MemberQR').then(m => ({ default: m.MemberQR })));
+const QuickAward = lazy(() => import('./QuickAward').then(m => ({ default: m.QuickAward })));
 
 const formatUpcomingDate = (dateStr: string) =>
     parseLocalDate(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -30,13 +33,17 @@ interface MemberPortalProps {
     onDeleteClubEvent?: (id: string) => void;
     onSignUpForEvent?: (eventId: string, memberId: string) => void;
     onCancelSignup?: (signupId: string) => void;
+    // Officer Quick Award (QR scan) -- same handler as the Points Manager's bulk award.
+    onBulkAwardPoints?: (memberIds: string[], points: number, reason: string, category: string) => Promise<boolean | void> | void;
 }
 
-export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports, onAddClubEvent, onDeleteClubEvent, onSignUpForEvent, onCancelSignup }) => {
+export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports, onAddClubEvent, onDeleteClubEvent, onSignUpForEvent, onCancelSignup, onBulkAwardPoints }) => {
     const [view, setView] = useState<'leaderboard' | 'vote' | 'stats' | 'calendar' | 'events' | 'edit_calendar'>('leaderboard');
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
     const [showDayModal, setShowDayModal] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showMyQr, setShowMyQr] = useState(false);
+    const [showQuickAward, setShowQuickAward] = useState(false);
 
     const canEdit = member.role === Role.OFFICER || member.role === Role.ADMIN;
 
@@ -187,6 +194,34 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                             </button>
                         )}
                     </div>
+                </div>
+
+                {/* My QR (everyone) + Quick Award (officers): scan-to-award points */}
+                <div className={`grid gap-3 ${canEdit && onBulkAwardPoints ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    <button
+                        type="button"
+                        onClick={() => setShowMyQr(true)}
+                        className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex items-center gap-3 text-left hover:border-[#154734]/40 transition-colors"
+                    >
+                        <span className="bg-[#154734] text-white p-2.5 rounded-lg shrink-0"><QrCode className="w-6 h-6" /></span>
+                        <span className="min-w-0">
+                            <span className="block font-bold text-[#154734]">My QR</span>
+                            <span className="block text-xs text-gray-500">Show an officer to get points</span>
+                        </span>
+                    </button>
+                    {canEdit && onBulkAwardPoints && (
+                        <button
+                            type="button"
+                            onClick={() => setShowQuickAward(true)}
+                            className="bg-[#FFB81C] rounded-xl p-4 shadow-sm border border-[#FFB81C] flex items-center gap-3 text-left hover:bg-yellow-400 transition-colors"
+                        >
+                            <span className="bg-[#154734] text-[#FFB81C] p-2.5 rounded-lg shrink-0"><Zap className="w-6 h-6" /></span>
+                            <span className="min-w-0">
+                                <span className="block font-bold text-[#154734]">Quick Award</span>
+                                <span className="block text-xs text-[#154734]/80">Scan member QRs</span>
+                            </span>
+                        </button>
+                    )}
                 </div>
 
                 {view === 'leaderboard' ? (
@@ -513,6 +548,13 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                         </div>
                     </div>
                 )}
+
+                <Suspense fallback={null}>
+                    {showMyQr && <MemberQR member={member} onClose={() => setShowMyQr(false)} />}
+                    {showQuickAward && canEdit && onBulkAwardPoints && (
+                        <QuickAward members={data.members} bonusPoints={data.bonusPoints} onAward={onBulkAwardPoints} onClose={() => setShowQuickAward(false)} />
+                    )}
+                </Suspense>
 
                 <SettingsModal
                     isOpen={showSettings}

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Member, Game, Role, Sport, BonusPoint, ClubEvent, EventSignup } from '../types';
-import { POINT_CATEGORIES } from '../constants';
+import { POINT_CATEGORIES, POINT_MENU, PointMenuItem } from '../constants';
+import { PointPresetSelect } from './PointPresetSelect';
+import { findPreset, capHits, chicagoDay, presetPointsLabel } from '../utils/pointMenu';
+import { todayInChicago } from '../utils/dateUtils';
 import { parseOutlookCSV } from '../utils/importUtils';
-import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet, Search, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet, Search, RefreshCw, Zap, AlertTriangle } from 'lucide-react';
 import { buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
 import { matchSignups } from '../utils/signupImport';
 import { GameCalendar } from './GameCalendar';
@@ -12,6 +15,7 @@ import { parseLocalDate, convertInputToCST, parseTimeTo24h, formatGameTime } fro
 
 const AutoFillModal = lazy(() => import('./AutoFillModal').then(m => ({ default: m.AutoFillModal })));
 const BugLog = lazy(() => import('./BugLog').then(m => ({ default: m.BugLog })));
+const QuickAward = lazy(() => import('./QuickAward').then(m => ({ default: m.QuickAward })));
 
 interface ManagementProps {
     members: Member[];
@@ -25,7 +29,7 @@ interface ManagementProps {
     onUpdateProfile: (updates: Partial<Member>, memberId?: string, actingPassword?: string) => Promise<string | null | void> | void;
     onAddBonusPoint: (memberId: string, points: number, reason: string, category?: string) => void;
     onDeleteBonusPoint: (id: string) => void;
-    onBulkAwardPoints?: (memberIds: string[], points: number, reason: string, category: string) => void;
+    onBulkAwardPoints?: (memberIds: string[], points: number, reason: string, category: string) => Promise<boolean | void> | void;
     clubEvents?: ClubEvent[];
     eventSignups?: EventSignup[];
     onAddClubEvent?: (event: Omit<ClubEvent, 'id'>) => void;
@@ -154,6 +158,36 @@ export const Management: React.FC<ManagementProps> = ({
     const [manualPoints, setManualPoints] = useState<number>(0);
     const [pointsReason, setPointsReason] = useState<string>('');
     const [pointsCategory, setPointsCategory] = useState<string>(POINT_CATEGORIES[0]);
+    // POINT_MENU presets: picking one prefills category/points/reason
+    // (reason = the preset label; officers can add details after it).
+    const [singlePresetKey, setSinglePresetKey] = useState('');
+    const [bulkPresetKey, setBulkPresetKey] = useState('');
+    const [showQuickAward, setShowQuickAward] = useState(false);
+    const singlePreset = POINT_MENU.find(p => p.key === singlePresetKey);
+    const bulkPreset = POINT_MENU.find(p => p.key === bulkPresetKey);
+    const applySinglePreset = (p: PointMenuItem | null) => {
+        setSinglePresetKey(p?.key || '');
+        if (!p) return;
+        setPointsCategory(p.category);
+        setManualPoints(p.points);
+        setPointsReason(p.label);
+    };
+    const applyBulkPreset = (p: PointMenuItem | null) => {
+        setBulkPresetKey(p?.key || '');
+        if (!p) return;
+        setBulkCategory(p.category);
+        setBulkPoints(p.points);
+        setBulkReason(p.label);
+    };
+    // Capped presets (e.g. 4 per month): who would go over with this award.
+    // Officers can still award anyway; the button says so explicitly.
+    const singleCapHits = selectedMemberId && manualPoints > 0
+        ? capHits([selectedMemberId], pointsReason, pointsCategory, bonusPoints)
+        : [];
+    const capHitText = (h: { memberId: string; used: number; max: number }) => {
+        const m = members.find(x => x.id === h.memberId);
+        return `${m ? `${m.firstName} ${m.lastName}` : 'Member'} (${h.used}/${h.max})`;
+    };
 
     // Bulk Award State -- same category/points/reason applied to several
     // members at once, for things an officer notices rather than a member
@@ -163,6 +197,10 @@ export const Management: React.FC<ManagementProps> = ({
     const [bulkPoints, setBulkPoints] = useState<number>(1);
     const [bulkReason, setBulkReason] = useState<string>('');
     const [bulkCategory, setBulkCategory] = useState<string>(POINT_CATEGORIES[0]);
+    // Repeatable presets used as-is (no details added) only count as
+    // "already credited" if it was today, so the same activity next week
+    // isn't skipped.
+    const bulkBarePreset = findPreset(bulkReason, bulkCategory)?.label.toLowerCase() === bulkReason.trim().toLowerCase();
     const toggleBulkSelected = (id: string) => {
         setBulkSelectedIds(prev => {
             const next = new Set(prev);
@@ -181,20 +219,26 @@ export const Management: React.FC<ManagementProps> = ({
     // Members already credited for this exact reason -- guards against
     // importing the same sheet twice.
     const bulkAlreadyAwarded = bulkReason.trim()
-        ? members.filter(m => bulkSelectedIds.has(m.id) && bonusPoints.some(b => b.memberId === m.id && b.reason.trim().toLowerCase() === bulkReason.trim().toLowerCase()))
+        ? members.filter(m => bulkSelectedIds.has(m.id) && bonusPoints.some(b => b.memberId === m.id && b.reason.trim().toLowerCase() === bulkReason.trim().toLowerCase() && (!bulkBarePreset || chicagoDay(b.date) === todayInChicago())))
+        : [];
+    const bulkCapHits = bulkPoints > 0
+        ? capHits(Array.from(bulkSelectedIds).filter(id => !bulkAlreadyAwarded.some(m => m.id === id)), bulkReason, bulkCategory, bonusPoints)
         : [];
 
-    const handleSubmitBulkAward = () => {
+    // skipOverCap: leave out members who'd go over a preset cap; otherwise
+    // the officer explicitly chose "Award anyway".
+    const handleSubmitBulkAward = (skipOverCap = false) => {
         if (bulkSelectedIds.size === 0 || bulkPoints === 0 || !bulkReason || !onBulkAwardPoints) {
             alert("Select at least one member, a reason, and non-zero points.");
             return;
         }
-        const skip = new Set(bulkAlreadyAwarded.map(m => m.id));
+        const skip = new Set([...bulkAlreadyAwarded.map(m => m.id), ...(skipOverCap ? bulkCapHits.map(h => h.memberId) : [])]);
         onBulkAwardPoints(Array.from(bulkSelectedIds).filter(id => !skip.has(id)), bulkPoints, bulkReason, bulkCategory);
         setImportUnmatched(null);
         setBulkSelectedIds(new Set());
         setBulkPoints(1);
         setBulkReason('');
+        setBulkPresetKey('');
     };
 
     // Club Events (tabling signups) State
@@ -374,6 +418,7 @@ export const Management: React.FC<ManagementProps> = ({
         onAddBonusPoint(selectedMemberId, manualPoints, pointsReason, pointsCategory);
         setManualPoints(0);
         setPointsReason('');
+        setSinglePresetKey('');
     };
 
     // --- Import Logic ---
@@ -791,10 +836,27 @@ export const Management: React.FC<ManagementProps> = ({
                 {/* --- POINTS MANAGER TAB --- */}
                 {activeTab === 'points' && (
                     <div className="flex flex-col h-full gap-4">
+                        {onBulkAwardPoints && members.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setShowQuickAward(true)}
+                                className="shrink-0 w-full bg-[#FFB81C] hover:bg-yellow-400 text-[#154734] rounded-xl p-4 shadow-sm flex items-center gap-3 text-left transition-colors"
+                            >
+                                <span className="bg-[#154734] text-[#FFB81C] p-2.5 rounded-lg shrink-0"><Zap className="w-6 h-6" /></span>
+                                <span>
+                                    <span className="block font-bold">Quick Award: scan member QR codes</span>
+                                    <span className="block text-xs text-[#154734]/80">Pick an activity, then scan each member's My QR with your phone camera.</span>
+                                </span>
+                            </button>
+                        )}
                         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm shrink-0">
                             <h3 className="font-bold text-[#154734] mb-4 flex items-center gap-2">
                                 <Trophy className="w-5 h-5" /> Adjust Member Points
                             </h3>
+                            <div className="mb-4">
+                                <label className="text-xs font-bold text-gray-500">Activity (BPLT point menu)</label>
+                                <PointPresetSelect value={singlePresetKey} onChange={applySinglePreset} />
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                                 <div>
                                     <label className="text-xs font-bold text-gray-500">Member</label>
@@ -815,7 +877,7 @@ export const Management: React.FC<ManagementProps> = ({
                                     <select
                                         className="w-full border p-2 rounded"
                                         value={pointsCategory}
-                                        onChange={e => setPointsCategory(e.target.value)}
+                                        onChange={e => { setPointsCategory(e.target.value); setSinglePresetKey(''); }}
                                     >
                                         {POINT_CATEGORIES.map(c => (
                                             <option key={c} value={c}>{c}</option>
@@ -832,6 +894,9 @@ export const Management: React.FC<ManagementProps> = ({
                                         onChange={e => setManualPoints(Number(e.target.value))}
                                         placeholder="e.g. 5 or -5"
                                     />
+                                    {singlePreset?.maxPoints !== undefined && (
+                                        <p className="text-[10px] text-gray-400 mt-0.5">Menu range: {presetPointsLabel(singlePreset)} pts</p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-gray-500">Reason</label>
@@ -846,11 +911,19 @@ export const Management: React.FC<ManagementProps> = ({
                                 </div>
                                 <button
                                     onClick={handleSubmitPoints}
-                                    className="bg-[#FFB81C] text-[#154734] font-bold py-2 px-4 rounded hover:bg-yellow-400"
+                                    className={`font-bold py-2 px-4 rounded ${singleCapHits.length ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-[#FFB81C] text-[#154734] hover:bg-yellow-400'}`}
                                 >
-                                    Apply Points
+                                    {singleCapHits.length ? 'Award anyway' : 'Apply Points'}
                                 </button>
                             </div>
+                            {singleCapHits.length > 0 && (
+                                <div className="mt-3 text-xs rounded-lg p-3 bg-amber-50 text-amber-900 border border-amber-200 flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    <span>
+                                        Over the cap: <b>{singleCapHits.map(capHitText).join(', ')}</b> already got "{findPreset(pointsReason, pointsCategory)?.label}" the max times this {findPreset(pointsReason, pointsCategory)?.cap?.per}. Tap "Award anyway" only if this is legit.
+                                    </span>
+                                </div>
+                            )}
                             <button
                                 onClick={() => setShowBulkAward(v => !v)}
                                 className="mt-4 text-sm font-bold text-[#154734] hover:underline flex items-center gap-1"
@@ -882,7 +955,7 @@ export const Management: React.FC<ManagementProps> = ({
                                 )}
                                 {bulkAlreadyAwarded.length > 0 && (
                                     <div className="mb-3 text-xs rounded-lg p-3 bg-blue-50 text-blue-900 border border-blue-200">
-                                        Already credited for "{bulkReason.trim()}", will be skipped: <b>{bulkAlreadyAwarded.map(m => `${m.firstName} ${m.lastName}`).join(', ')}</b>
+                                        Already credited for "{bulkReason.trim()}"{bulkBarePreset ? ' today' : ''}, will be skipped: <b>{bulkAlreadyAwarded.map(m => `${m.firstName} ${m.lastName}`).join(', ')}</b>
                                     </div>
                                 )}
                                 <div className="max-h-40 overflow-y-auto border rounded-lg p-2 mb-4 grid grid-cols-2 md:grid-cols-3 gap-1">
@@ -893,25 +966,51 @@ export const Management: React.FC<ManagementProps> = ({
                                         </label>
                                     ))}
                                 </div>
+                                <div className="mb-4">
+                                    <label className="text-xs font-bold text-gray-500">Activity (BPLT point menu)</label>
+                                    <PointPresetSelect value={bulkPresetKey} onChange={applyBulkPreset} />
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                     <div>
                                         <label className="text-xs font-bold text-gray-500">Category</label>
-                                        <select className="w-full border p-2 rounded" value={bulkCategory} onChange={e => setBulkCategory(e.target.value)}>
+                                        <select className="w-full border p-2 rounded" value={bulkCategory} onChange={e => { setBulkCategory(e.target.value); setBulkPresetKey(''); }}>
                                             {POINT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-gray-500">Points (+/-)</label>
                                         <input type="number" className="w-full border p-2 rounded" value={bulkPoints} onChange={e => setBulkPoints(Number(e.target.value))} />
+                                        {bulkPreset?.maxPoints !== undefined && (
+                                            <p className="text-[10px] text-gray-400 mt-0.5">Menu range: {presetPointsLabel(bulkPreset)} pts</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-gray-500">Reason</label>
                                         <input type="text" className="w-full border p-2 rounded" value={bulkReason} onChange={e => setBulkReason(e.target.value)} placeholder="e.g. Hospitality duty at BSB game" />
                                     </div>
-                                    <button onClick={handleSubmitBulkAward} className="bg-[#FFB81C] text-[#154734] font-bold py-2 px-4 rounded hover:bg-yellow-400">
-                                        Apply to {bulkSelectedIds.size - bulkAlreadyAwarded.length} Member{bulkSelectedIds.size - bulkAlreadyAwarded.length === 1 ? '' : 's'}
-                                    </button>
+                                    {bulkCapHits.length === 0 ? (
+                                        <button onClick={() => handleSubmitBulkAward()} className="bg-[#FFB81C] text-[#154734] font-bold py-2 px-4 rounded hover:bg-yellow-400">
+                                            Apply to {bulkSelectedIds.size - bulkAlreadyAwarded.length} Member{bulkSelectedIds.size - bulkAlreadyAwarded.length === 1 ? '' : 's'}
+                                        </button>
+                                    ) : (
+                                        <div className="flex flex-col gap-2">
+                                            <button onClick={() => handleSubmitBulkAward(true)} className="bg-[#FFB81C] text-[#154734] font-bold py-2 px-4 rounded hover:bg-yellow-400">
+                                                Skip over-cap, apply to {bulkSelectedIds.size - bulkAlreadyAwarded.length - bulkCapHits.length}
+                                            </button>
+                                            <button onClick={() => handleSubmitBulkAward(false)} className="bg-amber-500 text-white font-bold py-2 px-4 rounded hover:bg-amber-600">
+                                                Award anyway (all {bulkSelectedIds.size - bulkAlreadyAwarded.length})
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
+                                {bulkCapHits.length > 0 && (
+                                    <div className="mt-3 text-xs rounded-lg p-3 bg-amber-50 text-amber-900 border border-amber-200 flex items-start gap-2">
+                                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                                        <span>
+                                            Over the cap ({findPreset(bulkReason, bulkCategory)?.cap?.max} per {findPreset(bulkReason, bulkCategory)?.cap?.per}): <b>{bulkCapHits.map(capHitText).join(', ')}</b>
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -1086,6 +1185,12 @@ export const Management: React.FC<ManagementProps> = ({
                     onUpdateProfile={onUpdateProfile}
                     adminMode={true}
                 />
+            )}
+
+            {showQuickAward && onBulkAwardPoints && (
+                <Suspense fallback={null}>
+                    <QuickAward members={members} bonusPoints={bonusPoints} onAward={onBulkAwardPoints} onClose={() => setShowQuickAward(false)} />
+                </Suspense>
             )}
         </div>
     );

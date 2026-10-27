@@ -580,13 +580,16 @@ function App() {
     // once -- for things an officer notices rather than a member
     // self-reports (hospitality duty, photography, etc), per the call's
     // "we could make an excel sheet... instead have officers log it".
+    // Also used by Quick Award (QR scan) with a single member id; resolves
+    // true when the insert succeeded so the scanner can show its toast.
     const handleBulkAwardPoints = async (memberIds: string[], points: number, reason: string, category: string) => {
         const rows = memberIds.map(memberId => ({
             member_id: memberId, points, reason, category, date: new Date().toISOString(),
         }));
         const { error } = await supabase.from('bonus_points').insert(rows);
-        pointsWriteFailed('Bulk award', error);
+        const failed = pointsWriteFailed('Bulk award', error);
         await fetchCoreData();
+        return !failed;
     };
 
     const renderContent = () => {
@@ -660,7 +663,8 @@ function App() {
     if (mode === 'interest') return <InterestForm members={data.members} onSubmit={handleAddMember} onBack={handleLogout} />;
     if (mode === 'member' && currentMember) return (
         <Suspense fallback={<div className="h-screen bg-[#154734] flex items-center justify-center text-white"><RefreshCw className="w-10 h-10 animate-spin" /></div>}>
-            <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} onAddClubEvent={handleAddClubEvent} onDeleteClubEvent={handleDeleteClubEvent} onSignUpForEvent={handleSignUpForEvent} onCancelSignup={handleCancelSignup} />
+            <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} onAddClubEvent={handleAddClubEvent} onDeleteClubEvent={handleDeleteClubEvent} onSignUpForEvent={handleSignUpForEvent} onCancelSignup={handleCancelSignup}
+                onBulkAwardPoints={handleBulkAwardPoints} />
         </Suspense>
     );
 
