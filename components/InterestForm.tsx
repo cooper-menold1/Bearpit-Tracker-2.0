@@ -82,7 +82,11 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
             year: year || undefined,
             heardAbout: heardAbout || undefined,
             // Keep the free-text name filled for a picked member too (older views read it).
-            referredBy: referrer ? `${referrer.firstName} ${referrer.lastName}` : (referrerOther ? referredBy.trim() || undefined : undefined),
+            // Typed a name but never tapped a match: keep it as free text so an
+            // officer can still link it on the Applications page.
+            referredBy: referrer
+                ? `${referrer.firstName} ${referrer.lastName}`
+                : (referrerOther ? referredBy.trim() : referrerQuery.trim()) || undefined,
             referredById: referrer?.id,
             role: Role.PROSPECTIVE,
             yearsInBPLT: 0,

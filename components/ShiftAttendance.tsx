@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckSquare, Square, Loader2, ClipboardCheck } from 'lucide-react';
-import { ClubEvent, EventSignup, Member } from '../types';
+import { AttendanceRecord, ClubEvent, EventSignup, Game, Member } from '../types';
+import { isEventCheckin, checkinCategory, gamePointValue } from '../utils/fanTier';
 import { supabase } from '../utils/supabaseClient';
 import { todayInChicago, formatGameTime } from '../utils/dateUtils';
 
@@ -8,6 +9,10 @@ interface ShiftAttendanceProps {
     clubEvents: ClubEvent[];
     eventSignups: EventSignup[];
     members: Member[];
+    // Used to flag members who already got this shift's points from a
+    // rotating-code event check-in (same day, same category).
+    games?: Game[];
+    attendance?: AttendanceRecord;
 }
 
 // Club event shifts pay on attendance, not sign-up. On (or after) the event
@@ -16,7 +21,7 @@ interface ShiftAttendanceProps {
 // removes it. No schema change needed. A signup that already has a
 // bonus_point_id is "paid" -- that includes signups from before 2026-10-26,
 // which were paid at sign-up and keep their points.
-export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, eventSignups, members }) => {
+export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, eventSignups, members, games = [], attendance = {} }) => {
     const today = todayInChicago();
     // Today's and past events that have signups, most recent first.
     const markable = clubEvents
@@ -24,11 +29,23 @@ export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, ev
         .sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || ''));
     const [eventId, setEventId] = useState('');
     const [busy, setBusy] = useState<Set<string>>(new Set());
+    // signupId -> bonus_point_id written/cleared here, until the refetch
+    // brings eventSignups up to date (null = just unmarked).
+    const [paidOverride, setPaidOverride] = useState<Record<string, string | null>>({});
+    // Fresh signups from the server win over local overrides.
+    useEffect(() => { setPaidOverride({}); }, [eventSignups]);
     const ev = markable.find(e => e.id === eventId) || markable[0];
 
     if (!ev) return null;
 
+    const paidIdOf = (s: EventSignup) => (s.id in paidOverride ? paidOverride[s.id] : s.bonusPointId) || null;
     const signups = eventSignups.filter(s => s.eventId === ev.id);
+    // Event check-ins on the shift's day in the shift's category: a member
+    // checked in there already got points for (very likely) the same shift.
+    const sameDayCheckins = games.filter(g => isEventCheckin(g) && g.date.slice(0, 10) === ev.date && checkinCategory(g) === ev.category);
+    const codeCheckinPoints = (memberId: string) => sameDayCheckins
+        .filter(g => attendance[g.id]?.[memberId])
+        .reduce((sum, g) => sum + gamePointValue(g), 0);
     const nameOf = (id: string) => {
         const m = members.find(x => x.id === id);
         return m ? `${m.firstName} ${m.lastName}` : 'Unknown member';
@@ -39,7 +56,9 @@ export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, ev
         return next;
     });
 
-    const markAttended = async (s: EventSignup) => {
+    const markAttended = async (s: EventSignup, skipConfirm = false) => {
+        const viaCode = codeCheckinPoints(s.memberId);
+        if (viaCode > 0 && !skipConfirm && !window.confirm(`${nameOf(s.memberId)} already got +${viaCode} ${ev.category} from a check-in code today. Pay this shift too?`)) return;
         setBusyFor(s.id, true);
         try {
             const { data: bp, error } = await supabase.from('bonus_points').insert({
@@ -56,6 +75,8 @@ export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, ev
             if (linkError || !linked?.length) {
                 await supabase.from('bonus_points').delete().eq('id', bp.id);
                 if (linkError) throw linkError;
+            } else {
+                setPaidOverride(prev => ({ ...prev, [s.id]: bp.id }));
             }
         } catch (e: any) {
             console.error('Marking attended failed', e);
@@ -66,13 +87,15 @@ export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, ev
     };
 
     const unmarkAttended = async (s: EventSignup) => {
-        if (!s.bonusPointId) return;
+        const bonusPointId = paidIdOf(s);
+        if (!bonusPointId) return;
         if (!window.confirm(`Remove ${nameOf(s.memberId)}'s ${ev.pointsValue} pt${ev.pointsValue === 1 ? '' : 's'} for this shift?`)) return;
         setBusyFor(s.id, true);
         try {
             const { error } = await supabase.from('event_signups').update({ bonus_point_id: null }).eq('id', s.id);
             if (error) throw error;
-            const { error: bpError } = await supabase.from('bonus_points').delete().eq('id', s.bonusPointId);
+            setPaidOverride(prev => ({ ...prev, [s.id]: null }));
+            const { error: bpError } = await supabase.from('bonus_points').delete().eq('id', bonusPointId);
             if (bpError) throw bpError;
         } catch (e: any) {
             console.error('Unmarking failed', e);
@@ -82,7 +105,9 @@ export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, ev
         }
     };
 
-    const unpaid = signups.filter(s => !s.bonusPointId);
+    const unpaid = signups.filter(s => !paidIdOf(s));
+    // "Mark all" leaves out anyone already paid through a check-in code.
+    const unpaidNoCode = unpaid.filter(s => codeCheckinPoints(s.memberId) === 0);
 
     return (
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm shrink-0">
@@ -99,7 +124,8 @@ export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, ev
             </select>
             <div className="divide-y divide-gray-100 border rounded-lg">
                 {signups.map(s => {
-                    const paid = !!s.bonusPointId;
+                    const paid = !!paidIdOf(s);
+                    const viaCode = codeCheckinPoints(s.memberId);
                     const isBusy = busy.has(s.id);
                     return (
                         <button
@@ -115,18 +141,19 @@ export const ShiftAttendance: React.FC<ShiftAttendanceProps> = ({ clubEvents, ev
                             <span className="flex-1 font-medium text-gray-900">{nameOf(s.memberId)}</span>
                             <span className={`text-xs font-bold ${paid ? 'text-green-700' : 'text-gray-400'}`}>
                                 {paid ? `+${ev.pointsValue} ${ev.category}` : 'Not marked'}
+                                {viaCode > 0 && <span className="block text-amber-700">+{viaCode} via check-in code</span>}
                             </span>
                         </button>
                     );
                 })}
             </div>
-            {unpaid.length > 1 && (
+            {unpaidNoCode.length > 1 && (
                 <button
                     type="button"
-                    onClick={() => unpaid.forEach(markAttended)}
+                    onClick={() => unpaidNoCode.forEach(s => markAttended(s, true))}
                     className="mt-3 text-sm font-bold text-[#154734] hover:underline"
                 >
-                    Mark all {unpaid.length} attended
+                    Mark all {unpaidNoCode.length} attended
                 </button>
             )}
         </div>

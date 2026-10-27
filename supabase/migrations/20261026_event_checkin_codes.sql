@@ -112,9 +112,12 @@ as $$
     6, '0');
 $$;
 
-revoke all on function is_event_checkin_id(text) from public;
-revoke all on function event_checkin_parse_time(text) from public;
-revoke all on function event_checkin_code_for(text, bigint) from public;
+-- Supabase's default privileges grant EXECUTE on new public functions to
+-- anon/authenticated directly, so revoking from PUBLIC alone leaves them
+-- callable through /rpc. Name the roles too.
+revoke all on function is_event_checkin_id(text) from public, anon, authenticated;
+revoke all on function event_checkin_parse_time(text) from public, anon, authenticated;
+revoke all on function event_checkin_code_for(text, bigint) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 4. Officer screen: current code for one event check-in.
@@ -230,6 +233,7 @@ $$;
 revoke all on function rpc_event_checkin(text, text, text) from public;
 grant execute on function rpc_event_checkin(text, text, text) to anon, authenticated;
 
--- Verify (expect false, then a row per function):
-select has_table_privilege('anon', 'public.event_checkin_secrets', 'select') as anon_can_read_secrets;
+-- Verify (expect false, false, then a row per function):
+select has_table_privilege('anon', 'public.event_checkin_secrets', 'select') as anon_can_read_secrets,
+       has_function_privilege('anon', 'public.event_checkin_code_for(text, bigint)', 'execute') as anon_can_run_code_helper;
 select proname from pg_proc where proname in ('rpc_event_checkin', 'rpc_event_checkin_code') order by 1;

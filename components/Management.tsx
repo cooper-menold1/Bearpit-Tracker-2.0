@@ -1168,7 +1168,7 @@ export const Management: React.FC<ManagementProps> = ({
                             </button>
                         </div>
 
-                        <ShiftAttendance clubEvents={clubEvents} eventSignups={eventSignups} members={allMembers || members} />
+                        <ShiftAttendance clubEvents={clubEvents} eventSignups={eventSignups} members={allMembers || members} games={games} attendance={attendance} />
 
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-auto">
                             <div className="p-4 border-b bg-gray-50 font-bold text-gray-700 flex items-center gap-2">

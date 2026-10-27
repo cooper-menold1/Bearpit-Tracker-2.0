@@ -46,6 +46,9 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
     const selectedGame = games.find(g => g.id === selectedGameId);
     const useCode = !!selectedGame && isEventCheckin(selectedGame) && codesOn === true;
+    // Event picked but the code probe hasn't answered yet: don't let the
+    // location path submit in the meantime (it would skip the code).
+    const codeProbePending = !!selectedGame && isEventCheckin(selectedGame) && codesOn === null;
     const isAwayGame = selectedGame?.location === 'Away';
     const selectedSport = selectedGame ? sports.find(s => s.id === selectedGame.sportId) : null;
     const hasVenues = (selectedSport?.venueIds?.length || 0) > 0 && !isAwayGame;
@@ -126,13 +129,17 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
         }
     };
 
+    const latestGameIdRef = useRef('');
     const handleGameChange = async (gameId: string) => {
+        latestGameIdRef.current = gameId;
         setSelectedGameId(gameId);
         setSubmitError(null);
         const game = games.find(g => g.id === gameId);
         if (game && isEventCheckin(game)) {
             const on = await eventCodesAvailable();
             setCodesOn(on);
+            // Picked something else while the probe ran: that pick owns location now.
+            if (latestGameIdRef.current !== gameId) return;
             if (on) {
                 // The code replaces location: cancel any location request in flight.
                 requestIdRef.current++;
@@ -179,7 +186,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedGameId || !matchedMember || isSubmitting) return;
+        if (!selectedGameId || !matchedMember || isSubmitting || codeProbePending) return;
 
         setIsSubmitting(true);
         setSubmitError(null);
@@ -423,7 +430,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({ members, games, 
 
                             <button
                                 onClick={handleSubmit}
-                                disabled={!selectedGameId || isSubmitting || (useCode ? code.length !== 6 : isVerifyingLocation)}
+                                disabled={!selectedGameId || isSubmitting || codeProbePending || (useCode ? code.length !== 6 : isVerifyingLocation)}
                                 className="w-full bg-[#154734] text-white py-3 rounded-lg font-bold hover:bg-[#0f3325] disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-colors mt-4 flex items-center justify-center gap-2"
                             >
                                 {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}

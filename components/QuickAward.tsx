@@ -31,7 +31,9 @@ type CamState = 'starting' | 'live' | 'denied' | 'unsupported' | 'nocamera' | 'e
 type Toast = { kind: 'ok' | 'warn' | 'error' | 'info'; text: string };
 type LogEntry = { id: number; name: string; points: number; ok: boolean; at: Date };
 // Waiting on the officer: auto-award is off, or this award would go over the cap.
-type Pending = { member: Member; overCapUsed?: number };
+// repeat = this member already got this preset during this scanning session
+// (QR left in view past the 10s debounce), so a scan alone won't award again.
+type Pending = { member: Member; overCapUsed?: number; repeat?: number };
 
 interface BarcodeDetectorLike { detect(src: CanvasImageSource): Promise<{ rawValue: string }[]> }
 type JsQR = (data: Uint8ClampedArray, width: number, height: number, opts?: { inversionAttempts?: 'dontInvert' | 'onlyInvert' | 'attemptBoth' | 'invertFirst' }) => { data: string } | null;
@@ -125,6 +127,8 @@ export const QuickAward: React.FC<QuickAwardProps> = ({ members, bonusPoints, on
         const used = capUsedFor(member.id);
         const overCap = !!preset.cap && used + 1 > preset.cap.max;
         if (overCap) { setPending({ member, overCapUsed: used }); return; }
+        const repeat = sessionCounts.current.get(`${member.id}|${preset.key}`) || 0;
+        if (!confirmed && repeat > 0) { setPending({ member, repeat }); return; }
         if (!confirmed && !autoAward) { setPending({ member }); return; }
         doAward(member);
     };
@@ -368,6 +372,8 @@ export const QuickAward: React.FC<QuickAwardProps> = ({ members, bonusPoints, on
                                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                                         <span>Already has {pending.overCapUsed} of {preset.cap.max} this {preset.cap.per} for "{preset.label}". Awarding goes over the cap.</span>
                                     </p>
+                                ) : pending.repeat ? (
+                                    <p className="text-sm text-amber-800">Already awarded {pending.repeat}x this session for this activity. Award again?</p>
                                 ) : (
                                     <p className="text-sm text-gray-500">Award +{points} {preset?.category}?</p>
                                 )}
