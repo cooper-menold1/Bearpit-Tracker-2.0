@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, lazy, Suspense } from 'react';
-import { Member, AppState, Game, Role, ClubEvent } from '../types';
+import { Member, AppState, Game, Role, ClubEvent, GameRole } from '../types';
 import { LogOut, Trophy, MapPin, Calendar as CalendarIcon, CheckCircle2, LayoutList, X, Clock, Settings, Edit, Sparkles, TrendingUp, ClipboardList, Plus, Heart, RefreshCw } from 'lucide-react';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
@@ -9,6 +9,7 @@ import { SelfieContest } from './SelfieContest';
 import { FAN_TIERS } from '../constants';
 import { todayInChicago, parseLocalDate, formatGameTime, timeSortKey } from '../utils/dateUtils';
 import { computeLifetimeStats, gamePointValue, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory } from '../utils/fanTier';
+import { confirmedGameRoles } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
 
 const Management = lazy(() => import('./Management').then(m => ({ default: m.Management })));
@@ -30,9 +31,11 @@ interface MemberPortalProps {
     onDeleteClubEvent?: (id: string) => void;
     onSignUpForEvent?: (eventId: string, memberId: string) => void;
     onCancelSignup?: (signupId: string) => void;
+    onAddGameRole?: (role: Omit<GameRole, 'id' | 'createdAt'>) => void;
+    onDeleteGameRole?: (id: string) => void;
 }
 
-export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports, onAddClubEvent, onDeleteClubEvent, onSignUpForEvent, onCancelSignup }) => {
+export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogout, onUpdateProfile, onAddGame, onDeleteGame, onVote, sports, onAddClubEvent, onDeleteClubEvent, onSignUpForEvent, onCancelSignup, onAddGameRole, onDeleteGameRole }) => {
     const [view, setView] = useState<'leaderboard' | 'vote' | 'stats' | 'calendar' | 'events' | 'edit_calendar'>('leaderboard');
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
     const [showDayModal, setShowDayModal] = useState(false);
@@ -69,7 +72,16 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
             points: b.points,
             isBonus: false,
         }));
-        const activity = [...gameHistory, ...bonusHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Game-day roster roles, once checked in, e.g. "Game Day: Chant leader vs Kansas".
+        const roleHistory = confirmedGameRoles(data, member.id).map(({ role, game }) => ({
+            kind: 'bonus' as const,
+            date: game.date,
+            label: `${role.category}: ${role.role} vs ${game.opponent}`,
+            sub: 'Game-day roster',
+            points: role.points,
+            isBonus: false,
+        }));
+        const activity = [...gameHistory, ...bonusHistory, ...roleHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const thisSemester = currentSemester();
         const semesterPoints = activity
@@ -250,6 +262,11 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
                                 eventSignups={data.eventSignups}
                                 onAddClubEvent={onAddClubEvent}
                                 onDeleteClubEvent={onDeleteClubEvent}
+                                gameRoles={data.gameRoles}
+                                attendance={data.attendance}
+                                rosterMembers={data.members}
+                                onAddGameRole={onAddGameRole}
+                                onDeleteGameRole={onDeleteGameRole}
                                 userRole={member.role}
                             />
                             </Suspense>

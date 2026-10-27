@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Selfie, Member, Game, Sport, BonusPoint, SelfieVote, Role } from '../types';
-import { X, User, Folder, Trash2, ChevronDown, ChevronRight, Heart, Trophy } from 'lucide-react';
+import { X, User, Folder, Trash2, ChevronDown, ChevronRight, Heart, Trophy, BadgeCheck } from 'lucide-react';
+import { MEDIA_APPROVAL_POINTS, mediaApprovalReason } from '../utils/fanTier';
 
 interface SelfieGalleryProps {
     isOpen: boolean;
@@ -14,10 +15,13 @@ interface SelfieGalleryProps {
     bonusPoints: BonusPoint[];
     currentMember: Member;
     selfieVotes: SelfieVote[];
+    // Media approval: awards/removes the uploader's 'Media' points for a photo.
+    onApproveMedia?: (selfie: Selfie, points: number) => void;
+    onRemoveMediaApproval?: (selfie: Selfie) => void;
 }
 
 export const SelfieGallery: React.FC<SelfieGalleryProps> = ({
-    isOpen, onClose, selfies, members, games, sports, onDelete, onVote, bonusPoints, currentMember, selfieVotes
+    isOpen, onClose, selfies, members, games, sports, onDelete, onVote, bonusPoints, currentMember, selfieVotes, onApproveMedia, onRemoveMediaApproval
 }) => {
     const getMemberName = (id: string) => {
         const m = members.find(mem => mem.id === id);
@@ -84,6 +88,8 @@ export const SelfieGallery: React.FC<SelfieGalleryProps> = ({
                                     bonusPoints={bonusPoints}
                                     currentMember={currentMember}
                                     selfieVotes={selfieVotes}
+                                    onApproveMedia={onApproveMedia}
+                                    onRemoveMediaApproval={onRemoveMediaApproval}
                                 />
                             ))}
                         </div>
@@ -104,8 +110,10 @@ const SportSection: React.FC<{
     onVote: (selfieId: string, memberId: string) => void,
     bonusPoints: BonusPoint[],
     currentMember: Member,
-    selfieVotes: SelfieVote[]
-}> = ({ sportName, gamesData, games, getMemberName, onDelete, onVote, bonusPoints, currentMember, selfieVotes }) => {
+    selfieVotes: SelfieVote[],
+    onApproveMedia?: (selfie: Selfie, points: number) => void,
+    onRemoveMediaApproval?: (selfie: Selfie) => void
+}> = ({ sportName, gamesData, games, getMemberName, onDelete, onVote, bonusPoints, currentMember, selfieVotes, onApproveMedia, onRemoveMediaApproval }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     return (
@@ -149,6 +157,9 @@ const SportSection: React.FC<{
                                             currentMember={currentMember}
                                             hasVoted={selfieVotes.some(v => v.selfieId === photo.id && v.memberId === currentMember.id)}
                                             voteCount={selfieVotes.filter(v => v.selfieId === photo.id).length}
+                                            mediaApproval={bonusPoints.find(b => b.reason === mediaApprovalReason(photo.id))}
+                                            onApproveMedia={onApproveMedia}
+                                            onRemoveMediaApproval={onRemoveMediaApproval}
                                         />
                                     ))}
                                 </div>
@@ -169,9 +180,19 @@ const PhotoCard: React.FC<{
     isWinner: boolean,
     currentMember: Member,
     hasVoted: boolean,
-    voteCount: number
-}> = ({ photo, memberName, onDelete, onVote, isWinner, currentMember, hasVoted, voteCount }) => {
+    voteCount: number,
+    mediaApproval?: BonusPoint,
+    onApproveMedia?: (selfie: Selfie, points: number) => void,
+    onRemoveMediaApproval?: (selfie: Selfie) => void
+}> = ({ photo, memberName, onDelete, onVote, isWinner, currentMember, hasVoted, voteCount, mediaApproval, onApproveMedia, onRemoveMediaApproval }) => {
     const isAdmin = currentMember.role === Role.ADMIN || currentMember.role === Role.OFFICER;
+    // 1 = approved unofficial content, 2 = approved event photography.
+    const [mediaPoints, setMediaPoints] = useState(MEDIA_APPROVAL_POINTS.content);
+    const [savingApproval, setSavingApproval] = useState(false);
+    const runApproval = async (action: () => void | Promise<void>) => {
+        setSavingApproval(true);
+        try { await action(); } finally { setSavingApproval(false); }
+    };
 
     return (
         <div className={`group relative border rounded-lg overflow-hidden shadow-sm bg-gray-50 hover:shadow-md transition-all ${isWinner ? 'border-yellow-400 border-2' : 'border-gray-100'}`}>
@@ -188,6 +209,11 @@ const PhotoCard: React.FC<{
                     {isWinner && (
                         <div className="bg-yellow-400 text-[#154734] p-1.5 rounded-md shadow-lg" title="Selfie of the Week Winner!">
                             <Trophy className="w-4 h-4" />
+                        </div>
+                    )}
+                    {mediaApproval && (
+                        <div className="bg-[#154734] text-[#FFB81C] px-1.5 py-1 rounded-md shadow-lg text-[10px] font-bold flex items-center gap-1" title={`Approved for Media, +${mediaApproval.points}`}>
+                            <BadgeCheck className="w-3.5 h-3.5" /> Media +{mediaApproval.points}
                         </div>
                     )}
                 </div>
@@ -235,6 +261,38 @@ const PhotoCard: React.FC<{
                     </div>
                     {isWinner && <span className="text-[8px] font-black text-yellow-700 uppercase tracking-tighter">Winner</span>}
                 </div>
+                {isAdmin && onApproveMedia && onRemoveMediaApproval && (
+                    mediaApproval ? (
+                        <button
+                            type="button"
+                            disabled={savingApproval}
+                            onClick={() => runApproval(() => onRemoveMediaApproval(photo))}
+                            className="mt-2 w-full text-[10px] font-bold text-red-600 border border-red-200 hover:bg-red-50 rounded px-1 py-1 disabled:opacity-50"
+                        >
+                            Remove approval
+                        </button>
+                    ) : (
+                        <div className="mt-2 flex flex-col gap-1">
+                            <select
+                                aria-label="Media points"
+                                value={mediaPoints}
+                                onChange={e => setMediaPoints(Number(e.target.value))}
+                                className="w-full border rounded text-[10px] px-1 py-0.5 bg-white"
+                            >
+                                <option value={MEDIA_APPROVAL_POINTS.content}>+{MEDIA_APPROVAL_POINTS.content} Unofficial content</option>
+                                <option value={MEDIA_APPROVAL_POINTS.photography}>+{MEDIA_APPROVAL_POINTS.photography} Event photography</option>
+                            </select>
+                            <button
+                                type="button"
+                                disabled={savingApproval}
+                                onClick={() => runApproval(() => onApproveMedia(photo, mediaPoints))}
+                                className="w-full text-[10px] font-bold text-[#154734] bg-[#FFB81C] hover:bg-yellow-400 rounded px-1 py-1 disabled:opacity-50"
+                            >
+                                Approve for Media (+{mediaPoints})
+                            </button>
+                        </div>
+                    )
+                )}
             </div>
         </div>
     );

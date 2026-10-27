@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { INITIAL_STATE, LOGO_URL, HIDDEN_MEMBER_IDS } from './constants';
-import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate, ClubEvent } from './types';
+import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate, ClubEvent, GameRole } from './types';
+import { mediaApprovalReason } from './utils/fanTier';
 import { Login } from './components/Login';
 import { AttendanceForm, AttendanceLocation } from './components/AttendanceForm';
 import { InterestForm } from './components/InterestForm';
@@ -122,7 +123,8 @@ function App() {
             { data: selfieVotes },
             { data: emailTemplateRow },
             clubEventsRes,
-            eventSignupsRes
+            eventSignupsRes,
+            gameRolesRes
         ] = await Promise.all([
             supabase.from('sports').select('*'),
             supabase.from('games').select('*'),
@@ -135,7 +137,10 @@ function App() {
             supabase.from('email_templates').select('*').eq('id', 'prospective_welcome').maybeSingle(),
             // Falls back to empty if the club_events migration hasn't been run yet -- not fatal.
             supabase.from('club_events').select('*'),
-            supabase.from('event_signups').select('*')
+            supabase.from('event_signups').select('*'),
+            // Errors (no data) if the game_roles migration hasn't been run yet; gameRoles
+            // stays null then, which hides the game-day roster UI. Not fatal.
+            supabase.from('game_roles').select('*')
         ]);
         const clubEvents = clubEventsRes.data;
         const eventSignups = eventSignupsRes.data;
@@ -205,6 +210,10 @@ function App() {
                 location: e.location, maxSignups: e.max_signups ?? 2, pointsValue: e.points_value ?? 1, description: e.description
             })),
             eventSignups: (eventSignups || []).map((s: any) => ({ id: s.id, eventId: s.event_id, memberId: s.member_id, bonusPointId: s.bonus_point_id, timestamp: s.timestamp })),
+            gameRoles: gameRolesRes.data ? gameRolesRes.data.map((r: any) => ({
+                id: r.id, gameId: r.game_id, memberId: r.member_id, role: r.role,
+                category: r.category || 'Game Day', points: r.points ?? 0, createdAt: r.created_at
+            })) : null,
             emailTemplate: mappedEmailTemplate
         }));
     };
@@ -266,6 +275,26 @@ function App() {
             supabase.removeChannel(channels);
         };
     }, []);
+
+    // game_roles realtime gets its own channel, opened only once the table is
+    // known to exist: subscribing to a missing table could break the shared
+    // channel above for every other table.
+    const gameRolesAvailable = data.gameRoles != null;
+    useEffect(() => {
+        if (!gameRolesAvailable) return;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const channel = supabase
+            .channel('game-roles-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'game_roles' }, () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => { fetchCoreData(); }, 300);
+            })
+            .subscribe();
+        return () => {
+            clearTimeout(timer);
+            supabase.removeChannel(channel);
+        };
+    }, [gameRolesAvailable]);
 
     const handleLogin = (member: Member, password: string) => {
         setCurrentMember(member);
@@ -589,6 +618,53 @@ function App() {
         await fetchCoreData();
     };
 
+    // --- Game-day roster (game_roles) ---
+    // Assigning a role writes no points: they're derived in utils/fanTier.ts
+    // once the member also checks in to that game.
+    const handleAddGameRole = async (role: Omit<GameRole, 'id' | 'createdAt'>) => {
+        const { error } = await supabase.from('game_roles').insert({
+            game_id: role.gameId,
+            member_id: role.memberId,
+            role: role.role,
+            category: role.category,
+            points: role.points,
+        });
+        if (error?.code === '23505') alert('That member already has that role for this game.');
+        else pointsWriteFailed('Assigning the role', error);
+        await fetchCoreData();
+    };
+
+    const handleDeleteGameRole = async (id: string) => {
+        const { error } = await supabase.from('game_roles').delete().eq('id', id);
+        pointsWriteFailed('Removing the role', error);
+        await fetchCoreData();
+    };
+
+    // --- Media approval (photo gallery) ---
+    // Approving a photo awards the uploader 'Media' points as a bonus_points
+    // row keyed by the photo id in its reason. The DB is checked first (not
+    // just local state) so two officers approving at once can't double-award.
+    // Dated by the photo so the points land in the semester it was taken.
+    const handleApproveMedia = async (selfie: Selfie, points: number) => {
+        const reason = mediaApprovalReason(selfie.id);
+        const { data: existing, error: lookupError } = await supabase.from('bonus_points').select('id').eq('reason', reason).limit(1);
+        if (pointsWriteFailed('Approving the photo', lookupError)) return;
+        if (!existing || existing.length === 0) {
+            const { error } = await supabase.from('bonus_points').insert({
+                member_id: selfie.memberId, points, reason, category: 'Media', date: selfie.timestamp || new Date().toISOString(),
+            });
+            pointsWriteFailed('Approving the photo', error);
+        }
+        await fetchCoreData();
+    };
+
+    // Deletes by reason, so it also clears any duplicate approvals of this photo.
+    const handleRemoveMediaApproval = async (selfie: Selfie) => {
+        const { error } = await supabase.from('bonus_points').delete().eq('reason', mediaApprovalReason(selfie.id));
+        pointsWriteFailed('Removing the approval', error);
+        await fetchCoreData();
+    };
+
     const renderContent = () => {
         if (isLoading) return <div className="flex items-center justify-center h-full"><RefreshCw className="w-8 h-8 animate-spin text-green-700" /></div>;
         if (currentView === 'dashboard') return <Dashboard data={data} />;
@@ -632,6 +708,10 @@ function App() {
                 onDeleteClubEvent={handleDeleteClubEvent}
                 onAddSport={handleAddSport}
                 userRole={currentMember?.role}
+                gameRoles={data.gameRoles}
+                attendance={data.attendance}
+                onAddGameRole={handleAddGameRole}
+                onDeleteGameRole={handleDeleteGameRole}
             />
         );
         const sport = data.sports.find(s => s.id === currentView);
@@ -660,7 +740,7 @@ function App() {
     if (mode === 'interest') return <InterestForm members={data.members} onSubmit={handleAddMember} onBack={handleLogout} />;
     if (mode === 'member' && currentMember) return (
         <Suspense fallback={<div className="h-screen bg-[#154734] flex items-center justify-center text-white"><RefreshCw className="w-10 h-10 animate-spin" /></div>}>
-            <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} onAddClubEvent={handleAddClubEvent} onDeleteClubEvent={handleDeleteClubEvent} onSignUpForEvent={handleSignUpForEvent} onCancelSignup={handleCancelSignup} />
+            <MemberPortal member={currentMember} data={data} onLogout={handleLogout} onUpdateProfile={handleUpdateProfile} onVote={handleToggleSelfieVote} sports={data.sports} onAddGame={handleAddGame} onDeleteGame={handleDeleteGame} onAddClubEvent={handleAddClubEvent} onDeleteClubEvent={handleDeleteClubEvent} onSignUpForEvent={handleSignUpForEvent} onCancelSignup={handleCancelSignup} onAddGameRole={handleAddGameRole} onDeleteGameRole={handleDeleteGameRole} />
         </Suspense>
     );
 
@@ -707,7 +787,7 @@ function App() {
             <Instructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} sheetUrl="" onSaveUrl={() => { }} onSaveSettings={() => { }} />
             <Suspense fallback={null}>
                 {currentMember && (
-                    <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} bonusPoints={data.bonusPoints} currentMember={currentMember} selfieVotes={data.selfieVotes} />
+                    <SelfieGallery isOpen={showSelfies} onClose={() => setShowSelfies(false)} selfies={data.selfies} members={data.members} games={data.games} sports={data.sports} onDelete={async (id) => await supabase.from('selfies').delete().eq('id', id)} onVote={handleToggleSelfieVote} bonusPoints={data.bonusPoints} currentMember={currentMember} selfieVotes={data.selfieVotes} onApproveMedia={handleApproveMedia} onRemoveMediaApproval={handleRemoveMediaApproval} />
                 )}
                 <SportsManager isOpen={showSportsManager} onClose={() => setShowSportsManager(false)} sports={data.sports} games={data.games} onAddSport={handleAddSport} onDeleteSport={handleDeleteSport} onUpdateSportVenues={async (id, vids) => await supabase.from('sports').update({ venue_ids: vids }).eq('id', id)} />
                 <ChantManager isOpen={showChantManager} onClose={() => setShowChantManager(false)} />

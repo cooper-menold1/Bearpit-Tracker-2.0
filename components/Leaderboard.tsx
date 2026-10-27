@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { AppState, BonusPoint, Role } from '../types';
+import { AppState, BonusPoint, GameRole, Role } from '../types';
 import { Trophy, Medal, Filter, TrendingUp, Users, CalendarRange } from 'lucide-react';
 import { POINT_CATEGORIES } from '../constants';
 import { semesterOf, currentSemester, listSemesters } from '../utils/semester';
 import { computeLifetimeTiers, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory, GAME_ATTENDANCE_CATEGORY } from '../utils/fanTier';
+import { confirmedGameRoles } from '../utils/fanTier';
 
 const GAME_ATTENDANCE = GAME_ATTENDANCE_CATEGORY;
 const ALL_CATEGORIES = 'all';
@@ -45,6 +46,13 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
             if (list) list.push(bp);
             else bonusByMember.set(bp.memberId, [bp]);
         });
+        // Confirmed roster roles at the filtered games, grouped by member.
+        const filteredGameIds = new Set(games.map(g => g.id));
+        const confirmedRolesByMember = new Map<string, GameRole[]>();
+        confirmedGameRoles(data).forEach(({ role }) => {
+            if (!filteredGameIds.has(role.gameId)) return;
+            confirmedRolesByMember.set(role.memberId, [...(confirmedRolesByMember.get(role.memberId) || []), role]);
+        });
 
         const rows = data.members.map(member => {
             let gamePoints = 0;
@@ -68,6 +76,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
                     gamePoints += checkinPointsFor(game, firstIds, data.sports);
                     gamesAttended++;
                 }
+            });
+            // Confirmed game-day roster roles score in their own category, dated by the game.
+            confirmedRolesByMember.get(member.id)?.forEach(role => {
+                eventPoints += role.points;
+                eventByCategory[role.category] = (eventByCategory[role.category] || 0) + role.points;
             });
 
             // 2. Calculate Bonus Points (Manual)

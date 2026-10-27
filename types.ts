@@ -118,6 +118,19 @@ export interface EventSignup {
     timestamp: string;
 }
 
+// One officer-assigned game-day job (chant leader, setup crew, hospitality
+// team...) for one member at one game. The points are only earned once the
+// member also checks in to that game -- see utils/fanTier.ts confirmedGameRoles.
+export interface GameRole {
+    id: string;
+    gameId: string;
+    memberId: string;
+    role: string; // e.g. "Chant leader"
+    category: string; // one of constants.ts POINT_CATEGORIES
+    points: number;
+    createdAt?: string;
+}
+
 export interface AppState {
     members: Member[];
     sports: Sport[];
@@ -128,6 +141,7 @@ export interface AppState {
     selfieVotes: SelfieVote[]; // New field
     clubEvents: ClubEvent[];
     eventSignups: EventSignup[];
+    gameRoles?: GameRole[] | null; // null/undefined until the game_roles migration is run
     settings: Settings;
     emailTemplate: EmailTemplate | null;
 }

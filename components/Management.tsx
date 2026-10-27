@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Member, Game, Role, Sport, BonusPoint, ClubEvent, EventSignup } from '../types';
+import { Member, Game, Role, Sport, BonusPoint, ClubEvent, EventSignup, GameRole, AttendanceRecord } from '../types';
 import { POINT_CATEGORIES } from '../constants';
 import { parseOutlookCSV } from '../utils/importUtils';
 import { Plus, Trash2, Pencil, Save, X, Calendar as CalendarIcon, MapPin, Upload, Trophy, History, Info, Sparkles, Mail, Copy, Check, FileSpreadsheet, Search, RefreshCw } from 'lucide-react';
@@ -8,6 +8,9 @@ import { matchSignups } from '../utils/signupImport';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
 import { gamePointValue } from '../utils/fanTier';
+import { isGameRoleConfirmed } from '../utils/fanTier';
+import { GameRoster } from './GameRoster';
+import { Users } from 'lucide-react';
 import { parseLocalDate, convertInputToCST, parseTimeTo24h, formatGameTime } from '../utils/dateUtils';
 
 const AutoFillModal = lazy(() => import('./AutoFillModal').then(m => ({ default: m.AutoFillModal })));
@@ -32,6 +35,13 @@ interface ManagementProps {
     onDeleteClubEvent?: (id: string) => void;
     onAddSport?: (name: string) => Promise<string>;
     userRole?: Role;
+    // Game-day roster. gameRoles is null/undefined until the game_roles
+    // migration is run, which hides the roster button.
+    gameRoles?: GameRole[] | null;
+    attendance?: AttendanceRecord;
+    rosterMembers?: Member[]; // defaults to members (the portal passes members={})
+    onAddGameRole?: (role: Omit<GameRole, 'id' | 'createdAt'>) => void;
+    onDeleteGameRole?: (id: string) => void;
 }
 
 export const Management: React.FC<ManagementProps> = ({
@@ -52,8 +62,16 @@ export const Management: React.FC<ManagementProps> = ({
     onAddClubEvent,
     onDeleteClubEvent,
     onAddSport,
-    userRole
+    userRole,
+    gameRoles,
+    attendance = {},
+    rosterMembers,
+    onAddGameRole,
+    onDeleteGameRole
 }) => {
+    const rosterEnabled = !!gameRoles && !!onAddGameRole && !!onDeleteGameRole;
+    const [rosterGameId, setRosterGameId] = useState<string | null>(null);
+    const rosterGame = rosterGameId ? games.find(g => g.id === rosterGameId) : undefined;
     const [activeTab, setActiveTab] = useState<'members' | 'games' | 'points' | 'events' | 'bugs'>('games');
     const [selectedProfileMember, setSelectedProfileMember] = useState<Member | null>(null);
     const [showAutoFill, setShowAutoFill] = useState(false);
@@ -496,6 +514,19 @@ export const Management: React.FC<ManagementProps> = ({
                                                             <button type="button" aria-label={`Delete game vs ${game.opponent}`} onClick={() => { if (window.confirm('Delete?')) onDeleteGame(game.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3" /></button>
                                                         </div>
                                                     </div>
+                                                    {rosterEnabled && (() => {
+                                                        const roles = gameRoles!.filter(r => r.gameId === game.id);
+                                                        const pending = roles.filter(r => !isGameRoleConfirmed(r, attendance)).length;
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setRosterGameId(game.id); setShowDayDetails(false); }}
+                                                                className="mt-2 text-xs font-bold text-[#154734] bg-[#154734]/10 hover:bg-[#154734]/20 px-2 py-1 rounded flex items-center gap-1"
+                                                            >
+                                                                <Users className="w-3 h-3" /> Game-day roster ({roles.length}){pending > 0 && <span className="text-amber-700">· {pending} pending</span>}
+                                                            </button>
+                                                        );
+                                                    })()}
                                                 </div>
                                             ))
                                         )}
@@ -594,6 +625,20 @@ export const Management: React.FC<ManagementProps> = ({
                                     </div>
                                 </div>
                             </div>
+                        )}
+
+                        {/* Game-day roster for one game (opened from the day details) */}
+                        {rosterEnabled && rosterGame && (
+                            <GameRoster
+                                game={rosterGame}
+                                sports={sports}
+                                members={rosterMembers || members}
+                                attendance={attendance}
+                                gameRoles={gameRoles!.filter(r => r.gameId === rosterGame.id)}
+                                onAdd={onAddGameRole!}
+                                onDelete={onDeleteGameRole!}
+                                onClose={() => setRosterGameId(null)}
+                            />
                         )}
                     </div>
                 )}

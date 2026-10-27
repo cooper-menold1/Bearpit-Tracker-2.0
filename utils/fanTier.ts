@@ -1,4 +1,4 @@
-import { AppState, BonusPoint, Game, Member, Role, Sport } from '../types';
+import { AppState, AttendanceRecord, BonusPoint, Game, GameRole, Member, Role, Sport } from '../types';
 import { POINT_CATEGORIES, FAN_TIERS } from '../constants';
 import { isMeetingSport } from './applicationArchive';
 
@@ -67,7 +67,41 @@ export const firstSportGameIds = (memberId: string, data: Pick<AppState, 'games'
 export const checkinPointsFor = (game: Game, firstIds: Set<string>, sports?: Sport[]) =>
     gamePointValue(game, sports) + (firstIds.has(game.id) ? ATTENDANCE_POINTS.newSport : 0);
 
-// Check-in points for one member, split by category.
+// --- Game-day roster (game_roles) ---
+// Officers assign members a job at a game (chant leader, setup crew,
+// hospitality team...). Like attendance, these points are DERIVED, never
+// stored: a role only counts once that member also checked in to that game,
+// so the check-in is the proof they showed. Until then it's "pending".
+
+// Presets from the Official BPLT Incentive Framework (Fall 2026). Officers
+// can also type a custom role with its own category and points.
+export const GAME_ROLE_PRESETS = [
+    { role: 'Chant leader', category: 'Game Day', points: 2 },              // Lead/support chants
+    { role: 'Setup / tear-down crew', category: 'Game Day', points: 2 },    // Assist with game-day setup/tear-down
+    { role: 'Special game-day role', category: 'Game Day', points: 2 },     // Serve in a special game-day role (2-3)
+    { role: 'Hospitality Team', category: 'Hospitality', points: 2 },       // Serve on Hospitality Team at a game
+    { role: 'Hospitality responsibility', category: 'Hospitality', points: 1 }, // Assist with a designated hospitality responsibility
+    { role: 'Event photographer', category: 'Media', points: 2 },           // Take approved photography at an event
+];
+
+export const isGameRoleConfirmed = (role: Pick<GameRole, 'gameId' | 'memberId'>, attendance: AttendanceRecord) =>
+    !!attendance[role.gameId]?.[role.memberId];
+
+// The roles that earn points (member checked in), each with its game for
+// dating and labels. Pass memberId for one member. Roles whose game was
+// deleted are dropped. Empty when the game_roles migration hasn't been run.
+export const confirmedGameRoles = (data: Pick<AppState, 'games' | 'attendance' | 'gameRoles'>, memberId?: string) => {
+    const roles = (data.gameRoles || []).filter(r => (!memberId || r.memberId === memberId) && isGameRoleConfirmed(r, data.attendance));
+    if (roles.length === 0) return [];
+    const gamesById = new Map(data.games.map(g => [g.id, g]));
+    return roles.flatMap(role => {
+        const game = gamesById.get(role.gameId);
+        return game ? [{ role, game }] : [];
+    });
+};
+
+// Check-in points for one member, split by category. Confirmed game-day
+// roles ride along here since they also need the check-in.
 const checkinPointsByCategory = (memberId: string, data: AppState) => {
     const out: Record<string, number> = {};
     const firstIds = firstSportGameIds(memberId, data);
@@ -77,6 +111,7 @@ const checkinPointsByCategory = (memberId: string, data: AppState) => {
             out[c] = (out[c] || 0) + checkinPointsFor(g, firstIds, data.sports);
         }
     });
+    confirmedGameRoles(data, memberId).forEach(({ role }) => { out[role.category] = (out[role.category] || 0) + role.points; });
     return out;
 };
 
@@ -140,3 +175,14 @@ const buildLifetimeStats = (member: Member, checkins: Record<string, number>, my
 
     return { totalPoints, categories, categoriesEarned, tier, myBonusPoints };
 };
+
+// --- Media approval (photo gallery) ---
+// Approving a member's gallery photo awards a 'Media' bonus_points row whose
+// reason names the photo, so the same photo can't be credited twice and
+// "Remove approval" can find the row again.
+export const MEDIA_APPROVAL_POINTS = {
+    content: 1,     // Submit approved unofficial content
+    photography: 2, // Take approved photography at an event
+};
+
+export const mediaApprovalReason = (selfieId: string) => `Approved photo #${selfieId}`;
