@@ -8,7 +8,7 @@ import { Leaderboard } from './Leaderboard';
 import { SelfieContest } from './SelfieContest';
 import { FAN_TIERS } from '../constants';
 import { todayInChicago, parseLocalDate, formatGameTime, timeSortKey } from '../utils/dateUtils';
-import { computeLifetimeStats, gamePointValue, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory } from '../utils/fanTier';
+import { computeLifetimeStats, gamePointValue, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory, REFERRAL_CATEGORY } from '../utils/fanTier';
 import { confirmedGameRoles } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
 
@@ -49,7 +49,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
     // for the next level" instead of a single attendance percentage against
     // a spring/fall sport threshold).
     const stats = useMemo(() => {
-        const { totalPoints, categories, categoriesEarned, tier, myBonusPoints } = computeLifetimeStats(member, data);
+        const { totalPoints, categories, categoriesEarned, tier, myBonusPoints, myReferrals } = computeLifetimeStats(member, data);
 
         // Recent activity feed: combine game check-ins + manual bonus point
         // entries into one "where are my points coming from" timeline.
@@ -81,7 +81,17 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
             points: role.points,
             isBonus: false,
         }));
-        const activity = [...gameHistory, ...bonusHistory, ...roleHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Automatic referral points (someone named this member when applying / came to a first meeting).
+        const referralHistory = myReferrals.map(r => ({
+            kind: 'referral' as const,
+            date: r.date,
+            label: r.label,
+            sub: REFERRAL_CATEGORY,
+            points: r.points,
+            isBonus: false,
+        }));
+        // Undated entries (apply date unreadable) sort last.
+        const activity = [...gameHistory, ...bonusHistory, ...roleHistory, ...referralHistory].sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
 
         const thisSemester = currentSemester();
         const semesterPoints = activity

@@ -109,10 +109,20 @@ function App() {
         setShowChantManager(false);
     }, [currentMember, mode]);
 
+    // SECURITY FLAGGED: Do not select password column for all users
+    const MEMBER_COLUMNS = 'id, first_name, last_name, role, years_in_bplt, email, phone, year, heard_about, referred_by, fall_sport_id, spring_sport_id, is_chair';
+    // referred_by_id comes from 20261026_referral_points.sql. Until that's run the
+    // select errors, so fall back to the old column list (referral points just stay 0).
+    const fetchMembers = async () => {
+        const res = await supabase.from('members').select(MEMBER_COLUMNS + ', referred_by_id');
+        return res.error ? supabase.from('members').select(MEMBER_COLUMNS) : res;
+    };
+
     // Split from selfies on purpose: selfies.image_data holds public Storage URLs
     // (photos bucket) for full-size images, so re-running that query on every unrelated realtime event (e.g. one
     // attendance toggle) would re-download every photo for every connected
     // client. fetchCoreData() covers everything else and is cheap to re-run.
+
     const fetchCoreData = async () => {
         const [
             { data: sports },
@@ -128,8 +138,7 @@ function App() {
         ] = await Promise.all([
             supabase.from('sports').select('*'),
             supabase.from('games').select('*'),
-            // SECURITY FLAGGED: Do not select password column for all users
-            supabase.from('members').select('id, first_name, last_name, role, years_in_bplt, email, phone, year, heard_about, referred_by, fall_sport_id, spring_sport_id, is_chair'),
+            fetchMembers(),
             supabase.from('attendance').select('*'),
             supabase.from('bonus_points').select('*'),
             supabase.from('selfie_votes').select('*'),
@@ -163,6 +172,7 @@ function App() {
             year: m.year,
             heardAbout: m.heard_about,
             referredBy: m.referred_by,
+            referredById: m.referred_by_id || undefined,
             fallSportId: m.fall_sport_id,
             springSportId: m.spring_sport_id,
             isChair: m.is_chair
@@ -358,6 +368,7 @@ function App() {
             if (updates.fallSportId !== undefined) payload.fall_sport_id = updates.fallSportId;
             if (updates.springSportId !== undefined) payload.spring_sport_id = updates.springSportId;
             if (updates.isChair !== undefined) payload.is_chair = updates.isChair;
+            if (updates.referredById !== undefined) payload.referred_by_id = updates.referredById || null;
 
             if (Object.keys(payload).length > 0) {
                 const { error } = await supabase.from('members').update(payload).eq('id', idToUpdate);
@@ -420,8 +431,14 @@ function App() {
         if (newMember.year !== undefined) payload.year = newMember.year;
         if (newMember.heardAbout !== undefined) payload.heard_about = newMember.heardAbout;
         if (newMember.referredBy !== undefined) payload.referred_by = newMember.referredBy;
+        if (newMember.referredById !== undefined) payload.referred_by_id = newMember.referredById;
 
-        const { error } = await supabase.from('members').upsert(payload);
+        let { error } = await supabase.from('members').upsert(payload);
+        // Retry without referred_by_id if the referral migration hasn't been run yet.
+        if (error && 'referred_by_id' in payload) {
+            delete payload.referred_by_id;
+            ({ error } = await supabase.from('members').upsert(payload));
+        }
         if (error) { alert('Error saving member: ' + error.message); return; }
 
         if (newMember.role !== Role.PROSPECTIVE) {
@@ -678,6 +695,7 @@ function App() {
                 }}
                 onReject={handleDeleteMember}
                 onSaveTemplate={handleSaveEmailTemplate}
+                onLinkReferrer={(memberId, referrerId) => handleUpdateProfile({ referredById: referrerId }, memberId)}
             />
         );
         if (currentView === 'management') return (

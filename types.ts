@@ -19,6 +19,7 @@ export interface Member {
     year?: string; // class year, e.g. "Freshman" -- only meaningful pre-induction
     heardAbout?: string; // how a prospect heard about Bear Pit -- only meaningful pre-induction
     referredBy?: string; // name of the specific member who recommended a prospect -- only meaningful pre-induction
+    referredById?: string; // id of the member who referred them (picked on the interest form or linked by an officer); earns that member Recruitment points, see utils/fanTier.ts
     fallSportId?: string;
     springSportId?: string;
     isChair?: boolean;

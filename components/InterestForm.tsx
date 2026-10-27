@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Member, Role } from '../types';
-import { CheckCircle2, ArrowLeft, UserPlus, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, UserPlus, AlertTriangle, X } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 import { PrivacyLink } from './PrivacyPolicy';
+import { canBeReferrer } from '../utils/fanTier';
 
 interface InterestFormProps {
     members: Member[];
@@ -25,12 +26,32 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
     const [phone, setPhone] = useState('');
     const [year, setYear] = useState('');
     const [heardAbout, setHeardAbout] = useState('');
+    // Referrer: pick a current member (earns them Recruitment points
+    // automatically, see utils/fanTier.ts), or "someone else" for free text.
+    const [referrerId, setReferrerId] = useState('');
+    const [referrerQuery, setReferrerQuery] = useState('');
+    const [referrerOther, setReferrerOther] = useState(false);
     const [referredBy, setReferredBy] = useState('');
     const [submitted, setSubmitted] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
 
     const emailValid = email.toLowerCase().endsWith('@baylor.edu');
+
+    const referrerOptions = useMemo(
+        () => members.filter(canBeReferrer).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)),
+        [members]
+    );
+    const referrer = referrerOptions.find(m => m.id === referrerId);
+    // Every word typed must start a word of the name ("jo sm" finds John Smith).
+    const referrerMatches = useMemo(() => {
+        const words = referrerQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        if (words.length === 0) return [];
+        return referrerOptions.filter(m => {
+            const parts = `${m.firstName} ${m.lastName}`.toLowerCase().split(/\s+/);
+            return words.every(w => parts.some(p => p.startsWith(w)));
+        }).slice(0, 6);
+    }, [referrerQuery, referrerOptions]);
 
     // Someone already on the roster (Member/Officer/Admin, not a still-pending
     // Prospective) doesn't need to fill this out -- catches the case where an
@@ -60,7 +81,9 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
             phone: phone.trim() || undefined,
             year: year || undefined,
             heardAbout: heardAbout || undefined,
-            referredBy: referredBy.trim() || undefined,
+            // Keep the free-text name filled for a picked member too (older views read it).
+            referredBy: referrer ? `${referrer.firstName} ${referrer.lastName}` : (referrerOther ? referredBy.trim() || undefined : undefined),
+            referredById: referrer?.id,
             role: Role.PROSPECTIVE,
             yearsInBPLT: 0,
         };
@@ -72,7 +95,7 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
             // public "I'm interested" form, unattended, often on someone's
             // phone on weak signal at a table/game, so a lost signup with no
             // error shown is the failure mode that actually matters here.
-            const { error } = await supabase.from('members').insert({
+            const row: Record<string, unknown> = {
                 id: member.id,
                 first_name: member.firstName,
                 last_name: member.lastName,
@@ -83,7 +106,15 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                 year: member.year,
                 heard_about: member.heardAbout,
                 referred_by: member.referredBy,
-            });
+            };
+            if (member.referredById) row.referred_by_id = member.referredById;
+            let { error } = await supabase.from('members').insert(row);
+            // referred_by_id needs 20261026_referral_points.sql. If it's missing (or
+            // not granted yet), save without it -- the referrer's name is still in referred_by.
+            if (error && 'referred_by_id' in row && /referred_by_id|permission denied|PGRST204|42703|42501/i.test(`${error.code} ${error.message}`)) {
+                delete row.referred_by_id;
+                ({ error } = await supabase.from('members').insert(row));
+            }
             if (error) throw error;
 
             setSubmitted(true);
@@ -226,13 +257,58 @@ export const InterestForm: React.FC<InterestFormProps> = ({ members, onSubmit, o
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                             Who recommended you? <span className="text-gray-400 font-normal">(optional)</span>
                         </label>
-                        <input aria-label="Who recommended you"
-                            type="text"
-                            value={referredBy}
-                            onChange={e => setReferredBy(e.target.value)}
-                            className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
-                            placeholder="Their first AND last name, so they get recruiting credit"
-                        />
+                        {referrer ? (
+                            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-2.5">
+                                <span className="font-bold text-[#154734]">{referrer.firstName} {referrer.lastName}</span>
+                                <button type="button" aria-label="Clear who recommended you"
+                                    onClick={() => { setReferrerId(''); setReferrerQuery(''); }}
+                                    className="text-gray-400 hover:text-gray-700">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : referrerOther ? (
+                            <>
+                                <input aria-label="Who recommended you"
+                                    type="text"
+                                    value={referredBy}
+                                    onChange={e => setReferredBy(e.target.value)}
+                                    className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
+                                    placeholder="Their name, if you know it"
+                                />
+                                <button type="button" onClick={() => { setReferrerOther(false); setReferredBy(''); }}
+                                    className="text-xs font-bold text-[#154734] hover:underline mt-1">
+                                    Search the member list instead
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <input aria-label="Search for the member who recommended you"
+                                    type="text"
+                                    value={referrerQuery}
+                                    onChange={e => setReferrerQuery(e.target.value)}
+                                    className="w-full bg-white text-black border border-gray-300 rounded-lg p-2.5 focus:ring-[#FFB81C] focus:border-[#FFB81C]"
+                                    placeholder="Start typing a BearPit member's name"
+                                />
+                                {referrerQuery.trim() && (
+                                    <div className="mt-1 border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                                        {referrerMatches.map(m => (
+                                            <button type="button" key={m.id}
+                                                onClick={() => setReferrerId(m.id)}
+                                                className="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-[#FFB81C]/20">
+                                                {m.firstName} {m.lastName}
+                                            </button>
+                                        ))}
+                                        {referrerMatches.length === 0 && (
+                                            <p className="px-3 py-2 text-sm text-gray-500">No member found by that name.</p>
+                                        )}
+                                    </div>
+                                )}
+                                <button type="button" onClick={() => { setReferrerOther(true); setReferredBy(referrerQuery.trim()); }}
+                                    className="text-xs font-bold text-[#154734] hover:underline mt-1">
+                                    Someone else / not sure
+                                </button>
+                            </>
+                        )}
                     </div>
 
                     {existingMember && (
