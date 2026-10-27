@@ -69,7 +69,7 @@ export const gamePointValue = (
     game: Pick<Game, 'isBonus'> & Partial<Pick<Game, 'id' | 'pointsValue' | 'location' | 'sportId'>>,
     sports?: Sport[],
 ) => {
-    if (game.id !== undefined && isEventCheckin({ id: game.id })) return game.pointsValue || 1;
+    if (game.id !== undefined && isEventCheckin({ id: game.id })) return game.pointsValue ?? 1;
     if (isMeetingGame(game, sports)) return ATTENDANCE_POINTS.meeting * (game.isBonus ? 2 : 1);
     if (game.isBonus) return ATTENDANCE_POINTS.premium;
     return game.location === 'Away' || game.location === 'Neutral' ? ATTENDANCE_POINTS.away : ATTENDANCE_POINTS.home;

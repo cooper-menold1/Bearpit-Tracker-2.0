@@ -133,7 +133,7 @@ export const GameRoster: React.FC<GameRosterProps> = ({ game, sports, members, a
                         <select aria-label="Category" value={category} onChange={e => setCategory(e.target.value)} className="border p-2 rounded text-sm flex-1 focus:ring-2 focus:ring-[#154734] outline-none">
                             {POINT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <input type="number" aria-label="Points" value={points} onChange={e => setPoints(Number(e.target.value))} className="border p-2 rounded text-sm w-20 focus:ring-2 focus:ring-[#154734] outline-none" />
+                        <input type="number" aria-label="Points" value={points} min={0} onChange={e => setPoints(Math.max(0, Number(e.target.value) || 0))} className="border p-2 rounded text-sm w-20 focus:ring-2 focus:ring-[#154734] outline-none" />
                     </div>
                     <button
                         onClick={handleAdd}
