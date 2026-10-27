@@ -12,6 +12,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { ChantGallery } from './components/ChantGallery';
 import { supabase } from './utils/supabaseClient';
 import { splitApplications } from './utils/applicationArchive';
+import { takeCheckinParams, officerSession } from './utils/eventCheckin';
 
 // Lazily loaded: admin-only screens and on-demand modals. Splitting these out
 // (Dashboard alone pulls in recharts) keeps the initial bundle small for the
@@ -85,6 +86,9 @@ function App() {
         const savedMode = sessionStorage.getItem('bp_mode');
         return (savedMode as any) || 'login';
     });
+
+    // Opened from an officer's rotating check-in QR (?checkin=<gameId>&code=<code>).
+    const [qrCheckin, setQrCheckin] = useState(() => takeCheckinParams());
 
     const prospectiveCount = useMemo(
         () => splitApplications(data.members.filter(m => m.role === Role.PROSPECTIVE), data).active.length,
@@ -309,6 +313,7 @@ function App() {
     const handleLogin = (member: Member, password: string) => {
         setCurrentMember(member);
         currentPasswordRef.current = password;
+        officerSession.memberId = member.id; officerSession.password = password; // check-in code screen
         setMode(member.role === Role.ADMIN ? 'dashboard' : 'member');
     };
 
@@ -317,6 +322,7 @@ function App() {
     const handleLogout = () => {
         setCurrentMember(null);
         currentPasswordRef.current = null;
+        officerSession.memberId = null; officerSession.password = null;
         setMode('login');
         sessionStorage.removeItem('bp_member');
         sessionStorage.removeItem('bp_mode');
@@ -568,9 +574,10 @@ function App() {
         }
     };
 
-    // Signing up both claims a slot and awards the event's points in one
-    // step, per the call: "make sure to get your points, your table and
-    // do you sign up" -- members shouldn't have to do a separate step.
+    // Signing up only reserves a slot. Points are paid when an officer marks
+    // the member attended on the event day (components/ShiftAttendance.tsx),
+    // so no-shows don't keep credit. Signups made before 2026-10-26 already
+    // carry a bonus_point_id from the old pay-at-signup rule; those keep it.
     const handleSignUpForEvent = async (eventId: string, memberId: string) => {
         const event = data.clubEvents.find(e => e.id === eventId);
         if (!event) return;
@@ -581,22 +588,11 @@ function App() {
             alert("This event is already full.");
             return;
         }
-        const { data: bp, error: bpError } = await supabase.from('bonus_points').insert({
-            member_id: memberId,
-            points: event.pointsValue,
-            reason: event.title,
-            category: event.category,
-            date: new Date().toISOString(),
-        }).select('id').single();
-        if (pointsWriteFailed('Signing up', bpError)) return;
         const { error: signupError } = await supabase.from('event_signups').insert({
             event_id: eventId,
             member_id: memberId,
-            bonus_point_id: bp.id,
         });
         if (signupError) {
-            // Don't leave points behind for a slot that was never claimed.
-            await supabase.from('bonus_points').delete().eq('id', bp.id);
             // The DB slot-limit trigger (20261012_event_signup_slot_limit.sql)
             // raises 'event_full' when someone else grabbed the last slot first.
             if (/event_full/i.test(signupError.message || '')) {
@@ -608,8 +604,9 @@ function App() {
         await fetchCoreData();
     };
 
-    // Cancelling a signup also reverses the points it awarded, so someone
-    // backing out of a tabling shift doesn't keep credit for it.
+    // Cancelling a signup also reverses any points it carries (old
+    // pay-at-signup rows, or an attended mark), so someone backing out of a
+    // tabling shift doesn't keep credit for it. Most signups have none.
     const handleCancelSignup = async (signupId: string) => {
         const signup = data.eventSignups.find(s => s.id === signupId);
         if (!signup) return;
@@ -755,6 +752,9 @@ function App() {
     };
 
     if (isLoading) return <div className="h-screen bg-[#154734] flex items-center justify-center text-white"><RefreshCw className="w-10 h-10 animate-spin" /></div>;
+    // QR check-in sits on top of whatever mode the visitor is in; Back drops
+    // them where they were (still logged in, if they were).
+    if (qrCheckin) return <AttendanceForm members={data.members} games={data.games} sports={data.sports} onSubmit={handleFormSubmit} onBack={() => setQrCheckin(null)} initialGameId={qrCheckin.gameId} initialCode={qrCheckin.code} initialMember={currentMember} />;
     if (mode === 'chants') return <ChantGallery onBack={() => setMode('login')} />;
     if (mode === 'login') return <Login members={data.members} onLogin={handleLogin} onGuest={handleGuestForm} onChants={() => setMode('chants')} onInterest={() => setMode('interest')} selfies={data.selfies} />;
     if (mode === 'form') return <AttendanceForm members={data.members} games={data.games} sports={data.sports} onSubmit={handleFormSubmit} onBack={handleLogout} />;

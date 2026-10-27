@@ -115,7 +115,7 @@ export interface EventSignup {
     id: string;
     eventId: string;
     memberId: string;
-    bonusPointId?: string; // the BonusPoint row this signup awarded, so cancelling reverses it
+    bonusPointId?: string; // the BonusPoint row paid for this signup (set when an officer marks it attended; pre-2026-10-26 signups were paid at sign-up), so cancelling reverses it
     timestamp: string;
 }
 

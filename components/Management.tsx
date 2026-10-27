@@ -10,6 +10,8 @@ import { buildBulkMailto, downloadMailMergeCSV } from '../utils/emailTemplate';
 import { matchSignups } from '../utils/signupImport';
 import { GameCalendar } from './GameCalendar';
 import { SettingsModal } from './SettingsModal';
+import { EventCheckinTools } from './EventCheckinTools';
+import { ShiftAttendance } from './ShiftAttendance';
 import { gamePointValue } from '../utils/fanTier';
 import { isGameRoleConfirmed } from '../utils/fanTier';
 import { GameRoster } from './GameRoster';
@@ -46,6 +48,7 @@ interface ManagementProps {
     rosterMembers?: Member[]; // defaults to members (the portal passes members={})
     onAddGameRole?: (role: Omit<GameRole, 'id' | 'createdAt'>) => void;
     onDeleteGameRole?: (id: string) => void;
+    allMembers?: Member[]; // names for shift attendance when `members` is withheld (officer portal)
 }
 
 export const Management: React.FC<ManagementProps> = ({
@@ -71,7 +74,8 @@ export const Management: React.FC<ManagementProps> = ({
     attendance = {},
     rosterMembers,
     onAddGameRole,
-    onDeleteGameRole
+    onDeleteGameRole,
+    allMembers
 }) => {
     const rosterEnabled = !!gameRoles && !!onAddGameRole && !!onDeleteGameRole;
     const [rosterGameId, setRosterGameId] = useState<string | null>(null);
@@ -1115,12 +1119,13 @@ export const Management: React.FC<ManagementProps> = ({
                 {/* --- CLUB EVENTS TAB (tabling signups etc) --- */}
                 {activeTab === 'events' && (
                     <div className="flex flex-col h-full gap-4 overflow-y-auto">
+                        <EventCheckinTools games={games} sports={sports} />
                         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm shrink-0">
                             <h3 className="font-bold text-[#154734] mb-1 flex items-center gap-2">
                                 <CalendarIcon className="w-5 h-5" /> Create Club Event
                             </h3>
                             <p className="text-xs text-gray-500 mb-4">
-                                Tabling shifts, etc. Members sign up for an open slot from their portal and get the points automatically.
+                                Tabling shifts, etc. Members sign up for an open slot from their portal. Points are paid when you mark them attended below.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
@@ -1150,7 +1155,7 @@ export const Management: React.FC<ManagementProps> = ({
                                     <input type="number" min={1} className="w-full border p-2 rounded" value={eventForm.maxSignups} onChange={e => setEventForm(f => ({ ...f, maxSignups: Number(e.target.value) }))} />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500">Points per Signup</label>
+                                    <label className="text-xs font-bold text-gray-500">Points for Attending</label>
                                     <input type="number" className="w-full border p-2 rounded" value={eventForm.pointsValue} onChange={e => setEventForm(f => ({ ...f, pointsValue: Number(e.target.value) }))} />
                                 </div>
                                 <div className="md:col-span-2">
@@ -1162,6 +1167,8 @@ export const Management: React.FC<ManagementProps> = ({
                                 <Plus className="w-4 h-4" /> Create Event
                             </button>
                         </div>
+
+                        <ShiftAttendance clubEvents={clubEvents} eventSignups={eventSignups} members={allMembers || members} />
 
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-auto">
                             <div className="p-4 border-b bg-gray-50 font-bold text-gray-700 flex items-center gap-2">
