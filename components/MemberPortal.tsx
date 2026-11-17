@@ -9,7 +9,7 @@ import { SelfieContest } from './SelfieContest';
 import { FAN_TIERS } from '../constants';
 import { todayInChicago, parseLocalDate, formatGameTime, timeSortKey } from '../utils/dateUtils';
 import { computeLifetimeStats, gamePointValue, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory, REFERRAL_CATEGORY } from '../utils/fanTier';
-import { confirmedGameRoles } from '../utils/fanTier';
+import { confirmedGameRoles, checkinCounts } from '../utils/fanTier';
 import { semesterOf, currentSemester } from '../utils/semester';
 
 const Management = lazy(() => import('./Management').then(m => ({ default: m.Management })));
@@ -62,7 +62,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ member, data, onLogo
         // entries into one "where are my points coming from" timeline.
         const firstIds = firstSportGameIds(member.id, data);
         const gameHistory = data.games
-            .filter(g => data.attendance[g.id]?.[member.id])
+            .filter(g => data.attendance[g.id]?.[member.id] && checkinCounts(g))
             .map(g => ({
                 kind: 'game' as const,
                 date: g.date,

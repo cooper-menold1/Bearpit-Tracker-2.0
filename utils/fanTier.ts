@@ -4,6 +4,14 @@ import { isMeetingSport, getApplicationDate } from './applicationArchive';
 
 export const GAME_ATTENDANCE_CATEGORY = 'Attendance';
 
+// 2026-11-16 (Cooper): every point outside attendance comes ONLY from the exec
+// team's BPLT Excel sheet (synced daily by scripts/excel_sync.py into
+// bonus_points rows with source = 'excel'). While this is true the site counts:
+// game/meeting check-ins (Attendance) + sheet rows. It ignores hand-entered
+// bonus points, event check-ins in other categories, roster roles, referrals and
+// the officer +5. Set to false to bring all of those back (no data was deleted).
+export const SHEET_ONLY_POINTS = true;
+
 // Attendance points, from the Official BPLT Incentive Framework (Fall 2026).
 // Meetings are not on the framework's menu, so they keep their old value.
 export const ATTENDANCE_POINTS = {
@@ -50,6 +58,9 @@ const eventPrefixOf = (game: Pick<Game, 'id'>) =>
     Object.keys(EVENT_CHECKIN_PREFIXES).find(p => String(game.id).startsWith(p));
 
 export const isEventCheckin = (game: Pick<Game, 'id'>) => eventPrefixOf(game) !== undefined;
+
+// False for check-ins that don't count while SHEET_ONLY_POINTS is on (non-attendance event check-ins).
+export const checkinCounts = (game: Pick<Game, 'id'>) => !SHEET_ONLY_POINTS || checkinCategory(game) === GAME_ATTENDANCE_CATEGORY;
 
 // Category a check-in's points are filed under.
 export const checkinCategory = (game: Pick<Game, 'id'>) => {
@@ -116,6 +127,7 @@ export const isGameRoleConfirmed = (role: Pick<GameRole, 'gameId' | 'memberId'>,
 // dating and labels. Pass memberId for one member. Roles whose game was
 // deleted are dropped. Empty when the game_roles migration hasn't been run.
 export const confirmedGameRoles = (data: Pick<AppState, 'games' | 'attendance' | 'gameRoles'>, memberId?: string) => {
+    if (SHEET_ONLY_POINTS) return [];
     const roles = (data.gameRoles || []).filter(r => (!memberId || r.memberId === memberId) && isGameRoleConfirmed(r, data.attendance));
     if (roles.length === 0) return [];
     const gamesById = new Map(data.games.map(g => [g.id, g]));
@@ -133,6 +145,7 @@ const checkinPointsByCategory = (memberId: string, data: AppState) => {
     data.games.forEach(g => {
         if (data.attendance[g.id]?.[memberId]) {
             const c = checkinCategory(g);
+            if (SHEET_ONLY_POINTS && c !== GAME_ATTENDANCE_CATEGORY) return;
             out[c] = (out[c] || 0) + checkinPointsFor(g, firstIds, data.sports);
         }
     });
@@ -157,6 +170,7 @@ const ymd = (d: Date) =>
 // check in to their first meeting (dated by that meeting). Self-referrals earn nothing.
 export const referralAwardsByMember = (data: Pick<AppState, 'members' | 'games' | 'attendance' | 'sports'>) => {
     const out = new Map<string, ReferralAward[]>();
+    if (SHEET_ONLY_POINTS) return out;
     const referred = data.members.filter(m => m.referredById && m.referredById !== m.id);
     if (referred.length === 0) return out;
 
@@ -222,7 +236,9 @@ export const computeLifetimeTiers = (data: AppState) => {
 
 const buildLifetimeStats = (member: Member, checkins: Record<string, number>, myBonusPoints: BonusPoint[]) => {
     const categories = [
-        { name: GAME_ATTENDANCE_CATEGORY, points: checkins[GAME_ATTENDANCE_CATEGORY] || 0, icon: 'game' as const },
+        // Check-ins plus any Attendance bonus rows (away games logged in the BPLT Excel sheet, see scripts/excel_sync.py).
+        { name: GAME_ATTENDANCE_CATEGORY, points: (checkins[GAME_ATTENDANCE_CATEGORY] || 0)
+            + myBonusPoints.filter(b => b.category === GAME_ATTENDANCE_CATEGORY).reduce((sum, b) => sum + b.points, 0), icon: 'game' as const },
         ...POINT_CATEGORIES.map(name => ({
             name,
             points: myBonusPoints.filter(b => (b.category || 'Other') === name).reduce((sum, b) => sum + b.points, 0)
@@ -231,7 +247,7 @@ const buildLifetimeStats = (member: Member, checkins: Record<string, number>, my
         })),
     ];
     const totalPoints = categories.reduce((sum, c) => sum + c.points, 0)
-        + (member.role === Role.ADMIN || member.role === Role.OFFICER ? 5 : 0);
+        + (!SHEET_ONLY_POINTS && (member.role === Role.ADMIN || member.role === Role.OFFICER) ? 5 : 0);
 
     // Fan tier: highest tier where the member meets BOTH the points and
     // the breadth (distinct categories) requirement. 'Other' is excluded

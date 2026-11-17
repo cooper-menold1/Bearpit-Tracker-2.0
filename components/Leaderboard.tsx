@@ -4,7 +4,7 @@ import { Trophy, Medal, Filter, TrendingUp, Users, CalendarRange } from 'lucide-
 import { POINT_CATEGORIES } from '../constants';
 import { semesterOf, currentSemester, listSemesters } from '../utils/semester';
 import { computeLifetimeTiers, checkinPointsFor, firstSportGameIds, isEventCheckin, checkinCategory, GAME_ATTENDANCE_CATEGORY, referralAwardsByMember, REFERRAL_CATEGORY } from '../utils/fanTier';
-import { confirmedGameRoles } from '../utils/fanTier';
+import { confirmedGameRoles, checkinCounts } from '../utils/fanTier';
 
 const GAME_ATTENDANCE = GAME_ATTENDANCE_CATEGORY;
 const ALL_CATEGORIES = 'all';
@@ -68,6 +68,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data }) => {
             games.forEach(game => {
                 if (data.attendance[game.id]?.[member.id]) {
                     if (isEventCheckin(game)) {
+                        if (!checkinCounts(game)) return;
                         // Event check-ins (tabling etc.) score in their own category, not as a game.
                         const pts = checkinPointsFor(game, firstIds, data.sports);
                         eventPoints += pts;

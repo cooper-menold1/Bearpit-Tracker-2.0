@@ -35,3 +35,8 @@ supabase/.branches/
 *.pem
 *.key
 serviceAccount*.json
+
+# Excel sync (local state, reports, backups)
+sync-state/
+sync-reports/
+sync-backups/

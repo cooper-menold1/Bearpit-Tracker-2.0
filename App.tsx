@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { INITIAL_STATE, LOGO_URL, HIDDEN_MEMBER_IDS } from './constants';
 import { AppState, Member, Game, Selfie, Role, Sport, BonusPoint, SelfieVote, EmailTemplate, ClubEvent, GameRole } from './types';
-import { mediaApprovalReason } from './utils/fanTier';
+import { mediaApprovalReason, SHEET_ONLY_POINTS } from './utils/fanTier';
 import { Login } from './components/Login';
 import { AttendanceForm, AttendanceLocation } from './components/AttendanceForm';
 import { InterestForm } from './components/InterestForm';
@@ -218,7 +218,8 @@ function App() {
             attendance: attendanceMap,
             sports: mappedSports,
             selfieVotes: (selfieVotes || []).map((v: any) => ({ selfieId: v.selfie_id, memberId: v.member_id })),
-            bonusPoints: (bonusPoints || []).map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date, category: b.category || 'Other' })),
+            // Only Excel-sheet points count while SHEET_ONLY_POINTS is on (see utils/fanTier.ts).
+            bonusPoints: (bonusPoints || []).filter((b: any) => !SHEET_ONLY_POINTS || b.source === 'excel').map((b: any) => ({ id: b.id, memberId: b.member_id, points: b.points, reason: b.reason, date: b.date, category: b.category || 'Other' })),
             clubEvents: (clubEvents || []).map((e: any) => ({
                 id: e.id, title: e.title, category: e.category || 'Marketing', date: e.date, time: e.time,
                 location: e.location, maxSignups: e.max_signups ?? 2, pointsValue: e.points_value ?? 1, description: e.description
